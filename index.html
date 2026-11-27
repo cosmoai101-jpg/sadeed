@@ -1,0 +1,3214 @@
+
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Cosmo AI — Claude × Gemini × GPT + Leo</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Optional JSZip CDN for .docx extraction (with built-in pure-JS fallback if offline) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+          },
+          colors: {
+            cosmo: {
+              bg: '#FFFFFF',
+              settingsBg: '#F6F6F7',
+              pill: '#F3F4F6',
+              pillHover: '#E5E7EB',
+              skyBg: '#E8F1FF',
+              skyText: '#2563EB',
+              blue: '#2563EB',
+              blueHover: '#1D4ED8',
+              ink: '#111827',
+              muted: '#6B7280',
+            },
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.35);
+      border-radius: 9999px;
+    }
+
+    @keyframes dotPulse {
+      0%, 80%, 100% { transform: scale(0.65); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+    .typing-dot {
+      animation: dotPulse 1.3s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.16s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.32s; }
+
+    @keyframes orbBreath {
+      0%, 100% {
+        transform: scale(0.96);
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.25);
+      }
+      50% {
+        transform: scale(1.04);
+        box-shadow: 0 0 42px 14px rgba(37, 99, 235, 0.24);
+      }
+    }
+    .live-orb-active {
+      animation: orbBreath 2.2s infinite ease-in-out;
+    }
+
+    @keyframes waveBar {
+      0%, 100% { transform: scaleY(0.32); }
+      50% { transform: scaleY(1); }
+    }
+    .live-wave-bar {
+      transform-origin: center;
+      animation: waveBar 0.9s infinite ease-in-out;
+      animation-play-state: paused;
+    }
+    .live-wave-running .live-wave-bar {
+      animation-play-state: running;
+    }
+
+    /* Clean Assistant Message Prose */
+    .message-prose p {
+      margin-bottom: 0.65rem;
+      line-height: 1.65;
+      color: #1F2937;
+    }
+    .message-prose p:last-child { margin-bottom: 0; }
+    .message-prose ul, .message-prose ol {
+      margin: 0.45rem 0 0.75rem 1.35rem;
+      color: #1F2937;
+    }
+    .message-prose ul { list-style-type: disc; }
+    .message-prose ol { list-style-type: decimal; }
+    .message-prose li { margin-bottom: 0.3rem; line-height: 1.58; }
+    .message-prose h1, .message-prose h2, .message-prose h3, .message-prose h4 {
+      font-weight: 600;
+      color: #111827;
+      margin-top: 0.95rem;
+      margin-bottom: 0.35rem;
+      line-height: 1.3;
+    }
+    .message-prose h1 { font-size: 1.18rem; }
+    .message-prose h2 { font-size: 1.06rem; }
+    .message-prose h3 { font-size: 0.98rem; }
+    .message-prose blockquote {
+      border-left: 3px solid #2563EB;
+      padding: 0.3rem 0.8rem;
+      margin: 0.6rem 0;
+      color: #374151;
+      background: #F8FAFC;
+      border-radius: 0 0.5rem 0.5rem 0;
+    }
+    .message-prose a {
+      color: #2563EB;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .message-prose code.inline-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.83em;
+      background: #F3F4F6;
+      border: 1px solid #E5E7EB;
+      color: #1D4ED8;
+      padding: 0.1rem 0.35rem;
+      border-radius: 0.375rem;
+    }
+  </style>
+</head>
+
+<body class="h-full bg-white text-cosmo-ink font-sans antialiased overflow-hidden selection:bg-blue-100 selection:text-blue-900">
+  <!-- Main App Container -->
+  <div id="app" class="flex h-full w-full relative overflow-hidden bg-white">
+    <!-- Dimmed Backdrop for Slide-Out Sidebar -->
+    <div
+      id="sidebar-backdrop"
+      class="fixed inset-0 z-30 bg-black/35 hidden transition-opacity duration-200"
+      aria-hidden="true"
+    ></div>
+
+    <!-- ===================================================================== -->
+    <!-- 1. LEFT SLIDE-OVER SIDEBAR                                            -->
+    <!-- ===================================================================== -->
+    <aside
+      id="sidebar"
+      class="fixed inset-y-0 left-0 z-40 w-[82%] max-w-[325px] bg-white flex flex-col transition-transform duration-200 ease-out -translate-x-full shadow-2xl"
+      aria-label="Cosmo AI Navigation and Chat History"
+    >
+      <!-- Sidebar Top Header -->
+      <div class="px-5 pt-4 pb-2 flex items-center justify-between gap-2 shrink-0">
+        <div>
+          <span class="text-[20px] font-semibold tracking-tight text-gray-900 block leading-tight">Cosmo AI</span>
+          <span class="text-[11px] text-gray-500 font-medium block leading-snug">by Sadeed Ahmad Hashmi</span>
+          <span class="text-[10px] text-gray-400 block leading-tight">Founder · CEO, Hash Group of Intelligence</span>
+        </div>
+
+        <button
+          id="sidebar-search-toggle"
+          type="button"
+          class="w-10 h-10 rounded-full bg-gray-100/90 hover:bg-gray-200/80 active:scale-95 flex items-center justify-center text-gray-800 transition cursor-pointer shrink-0"
+          title="Search chats"
+          aria-label="Search chats"
+        >
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7.5" />
+            <line x1="20.5" y1="20.5" x2="16.35" y2="16.35" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Collapsible Chat Search Input -->
+      <div id="sidebar-search-bar" class="hidden px-4 pb-2 shrink-0">
+        <div class="flex items-center gap-2 bg-gray-100 rounded-full px-3.5 py-2">
+          <svg class="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7.5" />
+            <line x1="20.5" y1="20.5" x2="16.35" y2="16.35" />
+          </svg>
+          <input
+            id="sidebar-search-input"
+            type="text"
+            placeholder="Search chat history..."
+            class="w-full bg-transparent text-sm text-gray-900 placeholder-gray-500 focus:outline-none"
+          />
+          <button id="sidebar-search-clear" type="button" class="text-xs text-gray-400 hover:text-gray-700 cursor-pointer">
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- Scrollable Sidebar Body: Workspace Tools + Sign In Card + History -->
+      <div class="flex-1 overflow-y-auto px-3 pt-1 pb-4">
+        <nav class="space-y-0.5" aria-label="Workspace tools">
+          <button
+            type="button"
+            data-nav-action="images"
+            class="sidebar-nav-item w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl hover:bg-gray-100 active:bg-gray-100 text-left transition cursor-pointer"
+          >
+            <svg class="w-5 h-5 text-gray-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="5" width="14" height="14" rx="2.5" />
+              <path d="M7 3h12a2 2 0 0 1 2 2v12" />
+              <circle cx="8" cy="10" r="1.2" />
+              <path d="M17 15l-3.5-3.5L8 17" />
+            </svg>
+            <span class="text-[16px] font-medium text-gray-900">Images</span>
+          </button>
+
+          <button
+            type="button"
+            data-nav-action="library"
+            class="sidebar-nav-item w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl hover:bg-gray-100 active:bg-gray-100 text-left transition cursor-pointer"
+          >
+            <svg class="w-5 h-5 text-gray-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="5" width="3.5" height="14" rx="1" />
+              <rect x="9.5" y="5" width="3.5" height="14" rx="1" />
+              <path d="M15.2 5.4l3.3-.8 2.8 13.6-3.3.8z" />
+            </svg>
+            <span class="text-[16px] font-medium text-gray-900">Library</span>
+          </button>
+
+          <button
+            type="button"
+            data-nav-action="customize"
+            class="sidebar-nav-item w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl hover:bg-gray-100 active:bg-gray-100 text-left transition cursor-pointer"
+          >
+            <svg class="w-5 h-5 text-gray-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="4" y1="8" x2="20" y2="8" />
+              <line x1="4" y1="16" x2="20" y2="16" />
+              <circle cx="9" cy="8" r="2.2" fill="white" />
+              <circle cx="15" cy="16" r="2.2" fill="white" />
+            </svg>
+            <span class="text-[16px] font-medium text-gray-900">Customize</span>
+          </button>
+
+          <button
+            type="button"
+            data-nav-action="projects"
+            class="sidebar-nav-item w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl hover:bg-gray-100 active:bg-gray-100 text-left transition cursor-pointer"
+          >
+            <svg class="w-5 h-5 text-gray-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+            </svg>
+            <span class="text-[16px] font-medium text-gray-900">Projects</span>
+          </button>
+
+          <button
+            type="button"
+            data-nav-action="remote"
+            class="sidebar-nav-item w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl hover:bg-gray-100 active:bg-gray-100 text-left transition cursor-pointer"
+          >
+            <svg class="w-5 h-5 text-gray-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="16" height="11" rx="2" />
+              <path d="M8 19h8" />
+              <path d="M12 15v4" />
+            </svg>
+            <span class="text-[16px] font-medium text-gray-900">Remote</span>
+          </button>
+
+          <button
+            type="button"
+            data-nav-action="explore"
+            class="sidebar-nav-item w-full flex items-center gap-3.5 px-3 py-2.5 rounded-2xl hover:bg-gray-100 active:bg-gray-100 text-left transition cursor-pointer"
+          >
+            <svg class="w-5 h-5 text-gray-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+              <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+              <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+              <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+            </svg>
+            <span class="text-[16px] font-medium text-gray-900">Explore</span>
+          </button>
+        </nav>
+
+        <!-- ChatGPT-Style Log In / Sign Up Card (Hidden when signed in) -->
+        <div
+          id="sidebar-signin-card"
+          class="mt-3 mx-1 rounded-2xl bg-gray-50 border border-gray-200/80 p-3.5 space-y-2.5"
+        >
+          <div>
+            <div class="text-[13px] font-semibold text-gray-900">Log in or sign up</div>
+            <div class="text-[11px] text-gray-500 mt-0.5 leading-snug">
+              Save your conversations, Word extractions, and preferred Andaz across sessions.
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              id="sidebar-signin-btn"
+              type="button"
+              class="flex-1 py-2 px-3 rounded-full bg-gray-900 hover:bg-black active:scale-[0.98] text-white text-xs font-semibold transition cursor-pointer"
+            >
+              Log in
+            </button>
+            <button
+              id="sidebar-signup-btn"
+              type="button"
+              class="flex-1 py-2 px-3 rounded-full bg-white hover:bg-gray-100 border border-gray-300 text-gray-900 text-xs font-semibold transition cursor-pointer"
+            >
+              Sign up
+            </button>
+          </div>
+        </div>
+
+        <!-- Horizontal Divider -->
+        <div class="my-3.5 mx-2 border-t border-gray-200"></div>
+
+        <!-- Saved Chat History List -->
+        <div id="chat-history-list" class="space-y-0.5"></div>
+
+        <!-- "See all..." Toggle -->
+        <button
+          id="see-all-chats-btn"
+          type="button"
+          class="hidden w-full text-left px-3 py-2.5 text-[15px] font-normal text-gray-500 hover:text-gray-800 transition cursor-pointer"
+        >
+          See all...
+        </button>
+      </div>
+
+      <!-- Sticky Sidebar Bottom Footer: Blue "Chat" Pill + Circular Profile Avatar -->
+      <div class="px-4 py-3.5 bg-white border-t border-gray-100 flex items-center justify-between gap-3 shrink-0">
+        <button
+          id="sidebar-new-chat-btn"
+          type="button"
+          class="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-cosmo-blue hover:bg-cosmo-blueHover active:scale-[0.98] text-white text-[15px] font-medium shadow-xs transition cursor-pointer"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+          <span>Chat</span>
+        </button>
+
+        <button
+          id="sidebar-profile-settings-btn"
+          type="button"
+          class="w-11 h-11 rounded-full bg-gray-100 hover:bg-gray-200 p-1 flex items-center justify-center transition cursor-pointer relative"
+          title="Open Settings"
+          aria-label="Open Settings"
+        >
+          <span
+            id="sidebar-avatar-initials"
+            class="w-full h-full rounded-full bg-[#7A8189] text-white text-xs font-semibold flex items-center justify-center tracking-wide"
+          >
+            SA
+          </span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ===================================================================== -->
+    <!-- 2. MAIN CHAT WORKSPACE                                                -->
+    <!-- ===================================================================== -->
+    <main class="flex-1 flex flex-col min-w-0 h-full bg-white relative">
+      <!-- Top Header Bar -->
+      <header class="h-16 shrink-0 px-4 sm:px-6 bg-white flex items-center justify-between gap-3 z-20">
+        <!-- Left: Circular Two-Line Menu Button (=) + Cosmo Plus / Auth Pills -->
+        <div class="flex items-center gap-2.5 min-w-0">
+          <button
+            id="menu-toggle-btn"
+            type="button"
+            class="w-10 h-10 rounded-full bg-cosmo-pill hover:bg-cosmo-pillHover active:scale-95 flex items-center justify-center text-gray-900 transition cursor-pointer shrink-0"
+            title="Open Sidebar"
+            aria-label="Open Sidebar"
+          >
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round">
+              <line x1="6" y1="9.5" x2="18" y2="9.5" />
+              <line x1="6" y1="14.5" x2="14.5" y2="14.5" />
+            </svg>
+          </button>
+
+          <!-- "+ Cosmo Plus" Pill (Shown when signed in) -->
+          <button
+            id="cosmo-plus-pill"
+            type="button"
+            class="hidden inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-cosmo-skyBg hover:bg-blue-100/90 active:scale-[0.98] text-cosmo-skyText text-[15px] font-medium transition cursor-pointer truncate"
+            title="Customize Cosmo AI Model & Leo Star Thinking"
+          >
+            <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 2.5L14.1 9.9L21.5 12L14.1 14.1L12 21.5L9.9 14.1L2.5 12L9.9 9.9L12 2.5Z" />
+            </svg>
+            <span id="header-pill-label" class="truncate">+ Cosmo Plus</span>
+          </button>
+
+          <!-- Logged-Out Auth Pills ("Log in" black pill + "Sign up" white pill) -->
+          <div id="header-auth-group" class="flex items-center gap-2 shrink-0">
+            <button
+              id="header-signin-btn"
+              type="button"
+              class="px-4 py-2 rounded-full bg-gray-900 hover:bg-black active:scale-[0.98] text-white text-[13px] font-semibold shadow-2xs transition cursor-pointer"
+            >
+              Log in
+            </button>
+            <button
+              id="header-signup-btn"
+              type="button"
+              class="px-3.5 py-2 rounded-full bg-white hover:bg-gray-100 active:scale-[0.98] text-gray-800 border border-gray-200 text-[13px] font-medium transition cursor-pointer"
+            >
+              Sign up
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Circular Fresh-Chat Button -->
+        <button
+          id="header-new-chat-btn"
+          type="button"
+          class="w-10 h-10 rounded-full bg-cosmo-pill hover:bg-cosmo-pillHover active:scale-95 flex items-center justify-center text-gray-900 transition cursor-pointer shrink-0"
+          title="New Chat"
+          aria-label="New Chat"
+        >
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke-dasharray="3.2 2.6" d="M12 3.5a8.5 8.5 0 0 1 7.36 12.75L20.5 20.5l-4.25-1.14A8.5 8.5 0 1 1 12 3.5z" />
+          </svg>
+        </button>
+      </header>
+
+      <!-- Floating Toast Notification -->
+      <div
+        id="toast-banner"
+        class="hidden fixed top-18 left-1/2 -translate-x-1/2 z-50 max-w-xs sm:max-w-sm px-4 py-2.5 rounded-full border text-xs font-medium shadow-md transition-all"
+        role="status"
+      ></div>
+
+      <!-- Center Scrollable Area -->
+      <div id="messages-container" class="flex-1 overflow-y-auto px-4 sm:px-6 flex flex-col scroll-smooth">
+        <div id="messages-inner" class="w-full max-w-2xl mx-auto flex-1 flex flex-col">
+          <!-- Empty Home Screen -->
+          <div id="empty-state" class="flex-1 flex flex-col justify-end pb-4 sm:pb-6">
+            <div class="my-auto py-6 text-center space-y-2.5">
+              <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cosmo-skyBg text-cosmo-blue text-[11px] font-semibold tracking-wide">
+                <span>✦</span>
+                <span>HASH GROUP OF INTELLIGENCE</span>
+              </div>
+              <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900">
+                What can Cosmo AI help with?
+              </h2>
+              <p class="text-xs sm:text-sm text-gray-500 max-w-md mx-auto leading-relaxed">
+                Full AI created by <strong class="font-semibold text-gray-800">Sadeed Ahmad Hashmi</strong> — Founder of Cosmo AI &amp; CEO of Hash Group of Intelligence.
+              </p>
+            </div>
+
+            <!-- First-Time OpenRouter API Key Card (Permanently removed from DOM once saved) -->
+            <div
+              id="first-time-api-card"
+              class="mb-4 rounded-3xl bg-blue-50/70 border border-blue-200/90 p-4 shadow-2xs space-y-2.5"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="w-6 h-6 rounded-full bg-cosmo-blue text-white text-xs font-bold flex items-center justify-center">✦</span>
+                  <span class="text-sm font-semibold text-gray-900">OpenRouter API Key (One-Time Setup)</span>
+                </div>
+                <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white text-cosmo-blue border border-blue-200">
+                  Locks Forever
+                </span>
+              </div>
+              <p class="text-xs text-gray-600 leading-relaxed">
+                Enter your OpenRouter API key once below. After saving, this option is permanently removed and cannot be edited again here.
+              </p>
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  id="first-time-api-input"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="sk-or-v1-..."
+                  class="flex-1 rounded-2xl bg-white border border-blue-200 focus:border-cosmo-blue focus:outline-none px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400"
+                />
+                <button
+                  id="first-time-api-save-btn"
+                  type="button"
+                  class="px-5 py-2.5 rounded-2xl bg-cosmo-blue hover:bg-cosmo-blueHover active:scale-[0.98] text-white text-xs font-semibold shadow-xs transition cursor-pointer shrink-0"
+                >
+                  Save &amp; Lock Key
+                </button>
+              </div>
+              <div id="first-time-api-error" class="hidden text-xs font-medium text-rose-600"></div>
+            </div>
+
+            <!-- Starter Prompt Pills -->
+            <div class="space-y-1.5 sm:space-y-2">
+              <button
+                type="button"
+                data-starter-style="study"
+                data-starter="Explain a complex topic clearly with Gemini-style structured points and Claude-grade clarity."
+                class="starter-btn w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-2xl hover:bg-gray-100/80 active:bg-gray-100 text-left transition cursor-pointer group"
+              >
+                <svg class="w-5 h-5 text-gray-700 group-hover:text-gray-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                  <path d="M6 12v5c3 3 9 3 12 0v-5" />
+                </svg>
+                <span class="text-[16px] font-normal text-gray-700 group-hover:text-gray-900">Learn something</span>
+              </button>
+
+              <button
+                type="button"
+                data-starter-style="image"
+                data-starter="Craft a vivid, cinematic image generation prompt with lighting, lens, and composition details."
+                class="starter-btn w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-2xl hover:bg-gray-100/80 active:bg-gray-100 text-left transition cursor-pointer group"
+              >
+                <svg class="w-5 h-5 text-gray-700 group-hover:text-gray-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="3" ry="3" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                <span class="text-[16px] font-normal text-gray-700 group-hover:text-gray-900">Create an image</span>
+              </button>
+
+              <button
+                type="button"
+                data-starter-style="writing"
+                data-starter="Help me write or polish an important message with warmth, clarity, and impact."
+                class="starter-btn w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-2xl hover:bg-gray-100/80 active:bg-gray-100 text-left transition cursor-pointer group"
+              >
+                <svg class="w-5 h-5 text-gray-700 group-hover:text-gray-900 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                </svg>
+                <span class="text-[16px] font-normal text-gray-700 group-hover:text-gray-900">Write or edit</span>
+              </button>
+
+              <button
+                type="button"
+                data-starter-style="leo"
+                data-starter="Activate Leo Star Thinking to analyze a big creative or technical idea from first principles."
+                class="starter-btn w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-2xl hover:bg-gray-100/80 active:bg-gray-100 text-left transition cursor-pointer group"
+              >
+                <svg class="w-5 h-5 text-gray-700 group-hover:text-cosmo-blue shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2.5L14.2 9.8L21.5 12L14.2 14.2L12 21.5L9.8 14.2L2.5 12L9.8 9.8L12 2.5Z" />
+                </svg>
+                <span class="text-[16px] font-normal text-gray-700 group-hover:text-gray-900">Leo Star Thinking</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Active Message Thread -->
+          <div id="message-list" class="py-4 space-y-5 hidden"></div>
+        </div>
+      </div>
+
+      <!-- Quick "+" Popover Menu -->
+      <div
+        id="plus-popover"
+        class="hidden fixed bottom-20 left-4 sm:left-auto z-40 w-72 rounded-2xl bg-white border border-gray-200 shadow-xl p-1.5 space-y-0.5"
+        role="menu"
+      >
+        <button
+          id="popover-word-to-text"
+          type="button"
+          class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-blue-50/70 text-xs font-semibold text-gray-900 transition cursor-pointer"
+        >
+          <span class="flex items-center gap-2.5">
+            <span class="w-6 h-6 rounded-lg bg-blue-100 text-cosmo-blue flex items-center justify-center font-bold text-[11px]">W</span>
+            <span>Word to Text (.docx / .txt)</span>
+          </span>
+          <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-cosmo-skyBg text-cosmo-blue">Extract</span>
+        </button>
+
+        <button
+          id="popover-attach-file"
+          type="button"
+          class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-gray-100 text-xs font-medium text-gray-800 transition cursor-pointer"
+        >
+          <svg class="w-4 h-4 text-gray-500 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+          </svg>
+          <span>Upload Document (.md / .csv / .json)</span>
+        </button>
+
+        <div class="my-1 border-t border-gray-100"></div>
+
+        <button
+          id="popover-toggle-leo"
+          type="button"
+          class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-100 text-xs font-medium text-gray-800 transition cursor-pointer"
+        >
+          <span class="flex items-center gap-2">
+            <span class="text-cosmo-blue">✦</span>
+            <span>Leo Star Thinking</span>
+          </span>
+          <span id="popover-leo-state" class="text-[11px] font-semibold text-cosmo-blue">ON</span>
+        </button>
+
+        <button
+          id="popover-open-customize"
+          type="button"
+          class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-100 text-xs font-medium text-gray-800 transition cursor-pointer"
+        >
+          <span class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="4" y1="8" x2="20" y2="8" />
+              <line x1="4" y1="16" x2="20" y2="16" />
+              <circle cx="9" cy="8" r="2" fill="white" />
+              <circle cx="15" cy="16" r="2" fill="white" />
+            </svg>
+            <span>Customize Model &amp; Style</span>
+          </span>
+          <span id="popover-lens-name" class="text-[11px] text-gray-500">Fusion</span>
+        </button>
+      </div>
+      <input id="hidden-word-input" type="file" accept=".docx,.txt,.md,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" class="hidden" />
+      <input id="hidden-file-input" type="file" accept=".txt,.md,.json,.csv,.js,.py,.html,.docx" class="hidden" />
+
+      <!-- Bottom Floating Pill Input Bar -->
+      <div class="shrink-0 px-3 sm:px-6 pb-4 pt-2 bg-white">
+        <form id="chat-form" class="w-full max-w-2xl mx-auto space-y-2">
+          <!-- Attached Word-to-Text Document Chip & Preview Drawer -->
+          <div id="word-doc-attachment" class="hidden rounded-2xl bg-blue-50/75 border border-blue-200/90 px-3.5 py-2.5 transition">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-8 h-8 rounded-xl bg-cosmo-blue text-white flex items-center justify-center font-bold text-xs shrink-0">
+                  W
+                </div>
+                <div class="min-w-0">
+                  <div id="word-doc-filename" class="text-xs font-semibold text-gray-900 truncate">document.docx</div>
+                  <div id="word-doc-stats" class="text-[11px] text-gray-500">0 words · Ready to send</div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button
+                  id="word-doc-preview-toggle"
+                  type="button"
+                  class="px-2.5 py-1 rounded-full bg-white hover:bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-800 transition cursor-pointer"
+                >
+                  Preview / Edit Text
+                </button>
+                <button
+                  id="word-doc-copy-btn"
+                  type="button"
+                  class="px-2.5 py-1 rounded-full bg-white hover:bg-gray-100 border border-gray-200 text-[11px] font-medium text-cosmo-blue transition cursor-pointer"
+                >
+                  Copy Text
+                </button>
+                <button
+                  id="word-doc-insert-btn"
+                  type="button"
+                  class="px-2.5 py-1 rounded-full bg-cosmo-skyBg hover:bg-blue-100 text-[11px] font-semibold text-cosmo-blue transition cursor-pointer"
+                  title="Insert extracted text directly into the chat input box"
+                >
+                  Insert into Input
+                </button>
+                <button
+                  id="word-doc-remove-btn"
+                  type="button"
+                  class="w-6 h-6 rounded-full hover:bg-blue-100 text-gray-500 hover:text-gray-800 flex items-center justify-center text-xs transition cursor-pointer"
+                  title="Remove attached document"
+                  aria-label="Remove attached document"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <!-- Collapsible Extracted Word Text Editor -->
+            <div id="word-doc-editor-wrap" class="hidden mt-2.5 pt-2.5 border-t border-blue-200/70 space-y-1.5">
+              <div class="flex items-center justify-between text-[11px] text-gray-500">
+                <span>Extracted plain text (editable before sending to Cosmo AI):</span>
+                <span id="word-doc-char-count">0 chars</span>
+              </div>
+              <textarea
+                id="word-doc-textarea"
+                rows="5"
+                dir="auto"
+                class="w-full rounded-xl bg-white border border-blue-200 focus:border-cosmo-blue focus:outline-none p-2.5 text-xs text-gray-800 leading-relaxed resize-y"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="flex items-end gap-1.5 bg-[#F5F5F6] rounded-[28px] px-2.5 py-2 border border-gray-200/70 focus-within:border-gray-300 focus-within:bg-gray-100/90 shadow-2xs transition">
+            <!-- Left "+" Button -->
+            <button
+              id="plus-btn"
+              type="button"
+              class="w-9 h-9 rounded-full hover:bg-gray-200/80 active:scale-95 flex items-center justify-center text-gray-800 shrink-0 transition cursor-pointer"
+              title="Quick Tools & Word to Text"
+              aria-label="Quick Tools & Word to Text"
+            >
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+
+            <!-- Auto-Expanding Input Box -->
+            <textarea
+              id="prompt-input"
+              rows="1"
+              dir="auto"
+              placeholder="Ask Cosmo AI"
+              class="flex-1 bg-transparent text-[16px] text-gray-900 placeholder-gray-500 py-1.5 px-1 resize-none max-h-36 focus:outline-none leading-snug"
+            ></textarea>
+
+            <!-- Right Group: Mic Dictation + Royal Blue Dynamic Circular Button -->
+            <div class="flex items-center gap-1 shrink-0">
+              <button
+                id="dictate-btn"
+                type="button"
+                class="w-9 h-9 rounded-full hover:bg-gray-200/80 active:scale-95 flex items-center justify-center text-gray-900 transition cursor-pointer"
+                title="Voice Dictation"
+                aria-label="Voice Dictation"
+              >
+                <svg id="dictate-mic-svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                </svg>
+              </button>
+
+              <!-- Dynamic Royal Blue Circular Button (#2563EB) -->
+              <button
+                id="blue-action-btn"
+                type="button"
+                data-mode="live"
+                class="w-10 h-10 rounded-full bg-cosmo-blue hover:bg-cosmo-blueHover active:scale-95 text-white flex items-center justify-center shadow-xs transition-all duration-150 cursor-pointer"
+                title="Go Live Voice Chat"
+                aria-label="Go Live Voice Chat"
+              >
+                <!-- 4-Bar Vertical Waveform Icon (Empty input -> Go Live) -->
+                <svg id="icon-wave" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                  <line x1="6" y1="10" x2="6" y2="14" />
+                  <line x1="10" y1="6.5" x2="10" y2="17.5" />
+                  <line x1="14" y1="8" x2="14" y2="16" />
+                  <line x1="18" y1="10.5" x2="18" y2="13.5" />
+                </svg>
+
+                <!-- Upward Send Arrow Icon (Text typed/dictated -> Send) -->
+                <svg id="icon-send" class="w-5 h-5 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="6 11 12 5 18 11" />
+                </svg>
+
+                <!-- Stop Square Icon (Streaming -> Stop) -->
+                <svg id="icon-stop" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="2.5" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <!-- Bottom Attribution Footer -->
+        <div class="w-full max-w-2xl mx-auto pt-1.5 flex items-center justify-between gap-2 px-1 text-[11px] text-gray-400">
+          <span id="active-chat-style-indicator" class="truncate">✦ Andaz: Auto-Detect</span>
+          <span class="truncate text-right">Created by <strong class="font-medium text-gray-600">Sadeed Ahmad Hashmi</strong> · Founder &amp; CEO, Hash Group of Intelligence</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- 3. FULL-SCREEN SETTINGS OVERLAY                                         -->
+  <!-- ======================================================================= -->
+  <div
+    id="settings-screen"
+    class="fixed inset-0 z-50 hidden flex-col bg-cosmo-settingsBg overflow-hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Settings"
+  >
+    <!-- Top Settings Header -->
+    <div class="h-16 px-4 sm:px-6 flex items-center justify-between shrink-0 bg-cosmo-settingsBg">
+      <button
+        id="settings-back-btn"
+        type="button"
+        class="w-10 h-10 rounded-full bg-white hover:bg-gray-100 active:scale-95 flex items-center justify-center text-gray-900 shadow-2xs transition cursor-pointer"
+        aria-label="Back to chat"
+      >
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12" />
+          <polyline points="12 19 5 12 12 5" />
+        </svg>
+      </button>
+
+      <h1 class="text-[18px] font-semibold text-gray-900">Settings</h1>
+
+      <button
+        id="settings-info-btn"
+        type="button"
+        class="w-10 h-10 rounded-full bg-white hover:bg-gray-100 active:scale-95 flex items-center justify-center text-gray-900 shadow-2xs transition cursor-pointer"
+        aria-label="About Cosmo AI"
+      >
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Scrollable Grouped Settings Cards -->
+    <div class="flex-1 overflow-y-auto px-4 sm:px-6 pb-24">
+      <div class="max-w-lg mx-auto space-y-4">
+        <!-- Group 1: Account, Workspace, Upgrade to Cosmo Plus -->
+        <div class="rounded-3xl bg-white overflow-hidden shadow-2xs divide-y divide-gray-100">
+          <button
+            id="setting-row-account"
+            data-setting-item="account sign in log out profile email"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5 min-w-0">
+              <span id="settings-avatar-initials" class="w-9 h-9 rounded-full bg-[#7A8189] text-white text-xs font-semibold flex items-center justify-center shrink-0">SA</span>
+              <div class="min-w-0">
+                <div class="text-[15px] font-medium text-gray-900">Account</div>
+                <div id="settings-account-name" class="text-xs text-gray-500 truncate">Guest Mode (Tap to Sign In)</div>
+                <div id="settings-account-email" class="hidden text-[11px] text-gray-400 truncate"></div>
+              </div>
+            </div>
+            <span class="text-gray-400 text-sm">›</span>
+          </button>
+
+          <button
+            id="setting-row-workspace"
+            data-setting-item="workspace personal hash group of intelligence"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5">
+              <svg class="w-5 h-5 text-gray-800 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85">
+                <rect x="3" y="7" width="18" height="13" rx="2" />
+                <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              <span class="text-[15px] font-medium text-gray-900">Workspace</span>
+            </div>
+            <div class="flex items-center gap-2 text-sm text-gray-400">
+              <span id="settings-workspace-label">Personal</span>
+              <span>›</span>
+            </div>
+          </button>
+
+          <button
+            id="setting-row-upgrade"
+            data-setting-item="upgrade to cosmo plus tier unlimited"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5">
+              <svg class="w-5 h-5 text-cosmo-blue shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2.5L14.2 9.8L21.5 12L14.2 14.2L12 21.5L9.8 14.2L2.5 12L9.8 9.8L12 2.5Z" />
+              </svg>
+              <span class="text-[15px] font-medium text-cosmo-blue">Upgrade to Cosmo Plus</span>
+            </div>
+            <span class="text-gray-400 text-sm">›</span>
+          </button>
+        </div>
+
+        <!-- Group 2: Customize Cosmo AI -->
+        <div class="rounded-3xl bg-white overflow-hidden shadow-2xs">
+          <button
+            id="setting-row-customize"
+            data-setting-item="customize cosmo ai model personality claude gemini gpt leo star thinking"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5 min-w-0">
+              <svg class="w-5 h-5 text-gray-800 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85">
+                <line x1="4" y1="8" x2="20" y2="8" />
+                <line x1="4" y1="16" x2="20" y2="16" />
+                <circle cx="9" cy="8" r="2.2" fill="white" />
+                <circle cx="15" cy="16" r="2.2" fill="white" />
+              </svg>
+              <div class="min-w-0">
+                <div class="text-[15px] font-medium text-gray-900">Customize Cosmo AI</div>
+                <div id="settings-customize-sub" class="text-xs text-gray-500 truncate">Cosmo Fusion · Leo Star Thinking ON</div>
+              </div>
+            </div>
+            <span class="text-gray-400 text-sm">›</span>
+          </button>
+        </div>
+
+        <!-- Group 3: Creator & Organization, General, Usage, Notifications, Voice, Safety, Security -->
+        <div class="rounded-3xl bg-white overflow-hidden shadow-2xs divide-y divide-gray-100">
+          <button
+            id="setting-row-creator"
+            data-setting-item="creator organization sadeed ahmad hashmi founder ceo hash group of intelligence"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5 min-w-0">
+              <svg class="w-5 h-5 text-cosmo-blue shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85">
+                <path d="M12 2.5L14.2 9.8L21.5 12L14.2 14.2L12 21.5L9.8 14.2L2.5 12L9.8 9.8L12 2.5Z" />
+              </svg>
+              <div class="min-w-0">
+                <div class="text-[15px] font-medium text-gray-900">Creator &amp; Organization</div>
+                <div class="text-xs text-gray-500 truncate">Sadeed Ahmad Hashmi · Founder &amp; CEO, Hash Group of Intelligence</div>
+              </div>
+            </div>
+            <span class="text-gray-400 text-sm">›</span>
+          </button>
+
+          <button
+            id="setting-row-general"
+            data-setting-item="general clear history reset storage"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5">
+              <svg class="w-5 h-5 text-gray-800 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              <span class="text-[15px] font-medium text-gray-900">General</span>
+            </div>
+            <span class="text-gray-400 text-sm">›</span>
+          </button>
+
+          <button
+            id="setting-row-usage"
+            data-setting-item="usage and limits stats tokens chats"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5">
+              <svg class="w-5 h-5 text-gray-800 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85">
+                <rect x="3" y="4" width="18" height="16" rx="2.5" />
+                <polyline points="7 14 10 11 13 13 17 9" />
+              </svg>
+              <span class="text-[15px] font-medium text-gray-900">Usage and limits</span>
+            </div>
+            <span class="text-gray-400 text-sm">›</span>
+          </button>
+
+          <button
+            id="setting-row-notifications"
+            data-setting-item="notifications alerts sounds"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5">
+              <svg class="w-5 h-5 text-gray-800 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              <span class="text-[15px] font-medium text-gray-900">Notifications</span>
+            </div>
+            <span class="text-gray-400 text-sm">›</span>
+          </button>
+
+          <button
+            id="setting-row-voice"
+            data-setting-item="voice auto speak speech live audio"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5">
+              <svg class="w-5 h-5 text-gray-800 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line x1="6" y1="10" x2="6" y2="14" />
+                <line x1="10" y1="6.5" x2="10" y2="17.5" />
+                <line x1="14" y1="8" x2="14" y2="16" />
+                <line x1="18" y1="10.5" x2="18" y2="13.5" />
+              </svg>
+              <span class="text-[15px] font-medium text-gray-900">Voice</span>
+            </div>
+            <span class="text-gray-400 text-sm">›</span>
+          </button>
+
+          <button
+            id="setting-row-safety"
+            data-setting-item="safety and wellbeing privacy"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5">
+              <svg class="w-5 h-5 text-gray-800 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <span class="text-[15px] font-medium text-gray-900">Safety &amp; wellbeing</span>
+            </div>
+            <span class="text-gray-400 text-sm">›</span>
+          </button>
+
+          <button
+            id="setting-row-security"
+            data-setting-item="security and login local storage session"
+            type="button"
+            class="w-full px-4 py-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 text-left transition cursor-pointer"
+          >
+            <div class="flex items-center gap-3.5">
+              <svg class="w-5 h-5 text-gray-800 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85">
+                <rect x="4" y="11" width="16" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+              <span class="text-[15px] font-medium text-gray-900">Security and login</span>
+            </div>
+            <span class="text-gray-400 text-sm">›</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Bottom "Search settings" Bar -->
+    <div class="fixed bottom-4 inset-x-4 max-w-lg mx-auto">
+      <div class="flex items-center gap-2.5 bg-white/95 backdrop-blur rounded-full px-4 py-3 shadow-lg border border-gray-200/80">
+        <svg class="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7.5" />
+          <line x1="20.5" y1="20.5" x2="16.35" y2="16.35" />
+        </svg>
+        <input
+          id="settings-search-input"
+          type="text"
+          placeholder="Search settings"
+          class="w-full bg-transparent text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- 4. COMPACT SETTINGS SUB-SHEET MODAL                                     -->
+  <!-- ======================================================================= -->
+  <div
+    id="sub-sheet-modal"
+    class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <h3 id="sub-sheet-title" class="text-base font-semibold text-gray-900">Customize Cosmo AI</h3>
+        <button id="close-sub-sheet-btn" type="button" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center cursor-pointer">✕</button>
+      </div>
+      <div id="sub-sheet-body" class="space-y-3 text-sm text-gray-700"></div>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- 4B. CHATGPT-STYLE SIGN IN / SIGN UP MODAL                               -->
+  <!-- ======================================================================= -->
+  <div
+    id="signin-modal"
+    class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-black/45 p-0 sm:p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="signin-modal-title"
+  >
+    <div class="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-gray-100 space-y-5 max-h-[92vh] overflow-y-auto">
+      <!-- Top Header & Close -->
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2.5L14.1 9.9L21.5 12L14.1 14.1L12 21.5L9.9 14.1L2.5 12L9.9 9.9L12 2.5Z" />
+            </svg>
+          </div>
+          <div>
+            <h2 id="signin-modal-title" class="text-xl font-semibold tracking-tight text-gray-900">Welcome back</h2>
+            <p id="signin-modal-subtitle" class="text-xs text-gray-500 mt-0.5">Log in or sign up to sync your Cosmo AI workspace</p>
+          </div>
+        </div>
+        <button
+          id="close-signin-btn"
+          type="button"
+          class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition cursor-pointer shrink-0"
+          aria-label="Close Sign In"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Mode Switch Tabs: Log in / Sign up -->
+      <div class="grid grid-cols-2 p-1 rounded-full bg-gray-100 text-xs font-semibold">
+        <button
+          id="auth-tab-login"
+          type="button"
+          class="py-1.5 rounded-full bg-white text-gray-900 shadow-2xs transition cursor-pointer"
+        >
+          Log in
+        </button>
+        <button
+          id="auth-tab-signup"
+          type="button"
+          class="py-1.5 rounded-full text-gray-500 hover:text-gray-900 transition cursor-pointer"
+        >
+          Sign up
+        </button>
+      </div>
+
+      <!-- Email + Name + Password Form -->
+      <form id="signin-form" class="space-y-3">
+        <div id="signin-name-wrap" class="hidden">
+          <label for="signin-name-input" class="block text-xs font-medium text-gray-700 mb-1">Full name</label>
+          <input
+            id="signin-name-input"
+            type="text"
+            placeholder="Sadeed Ahmad Hashmi"
+            class="w-full rounded-2xl bg-white border border-gray-300 focus:border-gray-900 focus:outline-none px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition"
+          />
+        </div>
+
+        <div>
+          <label for="signin-email-input" class="block text-xs font-medium text-gray-700 mb-1">Email address</label>
+          <input
+            id="signin-email-input"
+            type="email"
+            required
+            placeholder="name@example.com"
+            class="w-full rounded-2xl bg-white border border-gray-300 focus:border-gray-900 focus:outline-none px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition"
+          />
+        </div>
+
+        <div>
+          <label for="signin-password-input" class="block text-xs font-medium text-gray-700 mb-1">Password</label>
+          <input
+            id="signin-password-input"
+            type="password"
+            required
+            placeholder="••••••••"
+            class="w-full rounded-2xl bg-white border border-gray-300 focus:border-gray-900 focus:outline-none px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition"
+          />
+        </div>
+
+        <button
+          id="signin-submit-btn"
+          type="submit"
+          class="w-full py-3 px-4 rounded-full bg-gray-900 hover:bg-black active:scale-[0.99] text-white text-sm font-semibold shadow-xs transition cursor-pointer"
+        >
+          Continue
+        </button>
+      </form>
+
+      <!-- OR Divider -->
+      <div class="relative flex items-center justify-center">
+        <div class="border-t border-gray-200 w-full"></div>
+        <span class="bg-white px-3 text-[11px] font-medium uppercase tracking-wider text-gray-400">OR</span>
+      </div>
+
+      <!-- 1-Click OAuth Provider Buttons -->
+      <div class="space-y-2.5">
+        <button
+          type="button"
+          data-oauth-provider="Google"
+          class="oauth-provider-btn w-full py-2.5 px-4 rounded-full bg-white hover:bg-gray-50 active:scale-[0.99] border border-gray-300 flex items-center justify-center gap-3 text-sm font-medium text-gray-800 transition cursor-pointer"
+        >
+          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"/>
+          </svg>
+          <span>Continue with Google</span>
+        </button>
+
+        <button
+          type="button"
+          data-oauth-provider="Microsoft"
+          class="oauth-provider-btn w-full py-2.5 px-4 rounded-full bg-white hover:bg-gray-50 active:scale-[0.99] border border-gray-300 flex items-center justify-center gap-3 text-sm font-medium text-gray-800 transition cursor-pointer"
+        >
+          <svg class="w-4 h-4 shrink-0" viewBox="0 0 21 21">
+            <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+            <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+            <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+          </svg>
+          <span>Continue with Microsoft Account</span>
+        </button>
+
+        <button
+          type="button"
+          data-oauth-provider="Apple"
+          class="oauth-provider-btn w-full py-2.5 px-4 rounded-full bg-white hover:bg-gray-50 active:scale-[0.99] border border-gray-300 flex items-center justify-center gap-3 text-sm font-medium text-gray-800 transition cursor-pointer"
+        >
+          <svg class="w-4 h-4 text-gray-900 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z"/>
+          </svg>
+          <span>Continue with Apple</span>
+        </button>
+      </div>
+
+      <!-- Footer -->
+      <div class="pt-1 flex items-center justify-between gap-2 text-xs">
+        <span class="text-gray-400">Saved locally in your browser</span>
+        <button
+          id="continue-guest-btn"
+          type="button"
+          class="font-medium text-gray-600 hover:text-gray-900 underline underline-offset-2 transition cursor-pointer"
+        >
+          Stay logged out
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- 5. COSMO GO LIVE CONVERSATIONAL VOICE OVERLAY                           -->
+  <!-- ======================================================================= -->
+  <div
+    id="go-live-overlay"
+    class="fixed inset-0 z-50 hidden flex-col justify-between bg-white p-5 sm:p-8"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="max-w-lg mx-auto w-full flex items-center justify-between">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cosmo-skyBg text-cosmo-blue text-xs font-semibold">
+        <span class="w-2 h-2 rounded-full bg-cosmo-blue animate-pulse"></span>
+        <span>Cosmo Go Live</span>
+      </div>
+
+      <select
+        id="live-lens-select"
+        class="rounded-full bg-gray-100 px-3.5 py-1.5 text-xs font-medium text-gray-800 focus:outline-none cursor-pointer"
+      >
+        <option value="fusion">Cosmo Fusion</option>
+        <option value="claude">Claude Editorial</option>
+        <option value="gemini">Gemini Multimodal</option>
+        <option value="gpt">GPT Precision</option>
+        <option value="leo">Leo Star Thinking</option>
+      </select>
+    </div>
+
+    <div class="max-w-lg mx-auto w-full flex-1 flex flex-col items-center justify-center text-center py-6 space-y-6">
+      <div
+        id="live-orb"
+        class="w-36 h-36 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-xl transition-transform"
+      >
+        <div id="live-waveform" class="flex items-center gap-2 h-12">
+          <span class="live-wave-bar w-2 h-6 rounded-full bg-white" style="animation-delay: 0s"></span>
+          <span class="live-wave-bar w-2 h-11 rounded-full bg-white" style="animation-delay: 0.15s"></span>
+          <span class="live-wave-bar w-2 h-9 rounded-full bg-white" style="animation-delay: 0.3s"></span>
+          <span class="live-wave-bar w-2 h-6 rounded-full bg-white" style="animation-delay: 0.45s"></span>
+        </div>
+      </div>
+
+      <div class="space-y-1.5">
+        <div id="live-phase-label" class="text-xs font-semibold uppercase tracking-widest text-cosmo-blue">Listening</div>
+        <p id="live-caption" dir="auto" class="text-lg font-medium text-gray-900 max-w-md px-4">
+          Speak naturally to Cosmo AI...
+        </p>
+      </div>
+
+      <div
+        id="live-transcript-feed"
+        class="w-full max-h-36 overflow-y-auto rounded-2xl bg-gray-50 border border-gray-200/70 p-3 text-left space-y-2 text-xs"
+      ></div>
+    </div>
+
+    <div class="max-w-lg mx-auto w-full space-y-3">
+      <form id="live-text-form" class="flex items-center gap-2">
+        <input
+          id="live-text-input"
+          type="text"
+          dir="auto"
+          placeholder="Or type a message in Live mode..."
+          class="flex-1 rounded-full bg-gray-100 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-500 focus:outline-none"
+        />
+        <button
+          type="submit"
+          class="px-4 py-2.5 rounded-full bg-cosmo-blue hover:bg-cosmo-blueHover text-white text-xs font-semibold cursor-pointer"
+        >
+          Send
+        </button>
+      </form>
+
+      <div class="flex items-center justify-center gap-4 pt-1">
+        <button
+          id="live-mic-toggle"
+          type="button"
+          class="w-12 h-12 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-900 flex items-center justify-center transition cursor-pointer"
+          title="Mute / Unmute Mic"
+        >
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </button>
+
+        <button
+          id="live-barge-in-btn"
+          type="button"
+          class="px-5 py-3 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold transition cursor-pointer"
+        >
+          Interrupt
+        </button>
+
+        <button
+          id="close-live-btn"
+          type="button"
+          class="w-12 h-12 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-md transition cursor-pointer"
+          title="End Live Chat"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- COMPLETE SELF-CONTAINED APPLICATION SCRIPT                              -->
+  <!-- ======================================================================= -->
+  <script>
+    (function () {
+      'use strict';
+
+      // =====================================================================
+      // 1. Constants, LocalStorage Keys & Pre-Configured API Key Lock
+      // =====================================================================
+      const STORAGE_KEYS = {
+        CHATS: 'cosmo_chat_history',
+        ACTIVE_CHAT: 'cosmo_active_chat_id',
+        SETTINGS: 'cosmo_user_settings',
+        API_KEY: 'cosmo_openrouter_api_key',
+        API_KEY_LOCKED: 'cosmo_api_key_locked',
+        AUTH_USER: 'cosmo_auth_user',
+      };
+
+      const CREATOR_NAME = 'Sadeed Ahmad Hashmi';
+      const CREATOR_TITLE = 'Founder of Cosmo AI & CEO of Hash Group of Intelligence';
+      const ORGANIZATION_NAME = 'Hash Group of Intelligence';
+      const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+      // Permanently store and lock the pre-configured OpenRouter API key
+      try {
+        localStorage.setItem(STORAGE_KEYS.API_KEY, EMBEDDED_OPENROUTER_API_KEY);
+        localStorage.setItem(STORAGE_KEYS.API_KEY_LOCKED, 'true');
+      } catch (err) {
+        // Ignore storage errors if sandboxed
+      }
+
+      const FALLBACK_MODELS = [
+        'google/gemini-2.0-flash-001',
+        'openai/gpt-4o-mini',
+        'anthropic/claude-3.5-haiku',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'openrouter/auto',
+      ];
+
+      const LENS_CONFIG = {
+        fusion: {
+          label: 'Cosmo Fusion',
+          model: 'google/gemini-2.0-flash-001',
+          directive: 'Blend Claude editorial clarity, Gemini structured synthesis, GPT precision, and Leo Star imaginative insight.',
+        },
+        claude: {
+          label: 'Claude Editorial',
+          model: 'anthropic/claude-3.5-sonnet',
+          directive: 'Adopt an editorial, empathetic, deeply thoughtful tone with nuanced reasoning and clean prose.',
+        },
+        gemini: {
+          label: 'Gemini Multimodal',
+          model: 'google/gemini-2.0-flash-001',
+          directive: 'Organize knowledge into crisp sections, clear bullet points, and broad contextual synthesis.',
+        },
+        gpt: {
+          label: 'GPT Precision',
+          model: 'openai/gpt-4o-mini',
+          directive: 'Respond with crisp step-by-step accuracy, actionable solutions, and clean technical formatting.',
+        },
+        leo: {
+          label: 'Leo Star Deep Thinking',
+          model: 'deepseek/deepseek-r1',
+          directive: 'Think from first principles with bold creative insight, uncovering hidden assumptions and novel angles.',
+        },
+      };
+
+      const ANDAZ_LABELS = {
+        auto: 'Auto-Detect',
+        urdu: 'اردو انداز (Urdu)',
+        roman_urdu: 'Roman Urdu Andaz',
+        study: 'Learn & Explain',
+        image: 'Image Prompt Studio',
+        writing: 'Editorial Writing',
+        leo: 'Leo Star Thinking',
+        coding: 'Code & Architecture',
+        voice_live: 'Go Live Voice',
+        document: 'Word Document Analysis',
+      };
+
+      const BASE_SYSTEM_PROMPT =
+        'You are Cosmo AI, a unified flagship artificial intelligence created in full by Sadeed Ahmad Hashmi — Founder of Cosmo AI and CEO of Hash Group of Intelligence. Never claim to be created by OpenAI, Anthropic, or Google. Whenever asked who created, built, owns, or founded you, state clearly and proudly that the full AI is created by Sadeed Ahmad Hashmi, Founder of Cosmo AI and CEO of Hash Group of Intelligence. Match the exact language, tone, and conversational style ("andaz") the user started the conversation in.';
+
+      // =====================================================================
+      // 2. Application State
+      // =====================================================================
+      const state = {
+        chats: [],
+        activeChatId: null,
+        showAllChats: false,
+        searchQuery: '',
+        isStreaming: false,
+        abortController: null,
+        authMode: 'login',
+        user: null,
+        attachedDoc: null,
+        pendingAndaz: 'auto',
+        settings: {
+          lens: 'fusion',
+          leoThinking: true,
+          autoSpeak: false,
+          workspace: 'Personal',
+          notifications: true,
+        },
+        isDictating: false,
+        dictationRec: null,
+        isLiveActive: false,
+        liveRec: null,
+        liveMuted: false,
+      };
+
+      // Safe DOM getter
+      function $(id) {
+        return document.getElementById(id);
+      }
+
+      // =====================================================================
+      // 3. Storage Helpers
+      // =====================================================================
+      function loadState() {
+        try {
+          const savedSettings = JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) || 'null');
+          if (savedSettings && typeof savedSettings === 'object') {
+            state.settings = Object.assign({}, state.settings, savedSettings);
+          }
+        } catch (e) {}
+
+        try {
+          const savedUser = JSON.parse(localStorage.getItem(STORAGE_KEYS.AUTH_USER) || 'null');
+          if (savedUser && savedUser.email) {
+            state.user = savedUser;
+          }
+        } catch (e) {}
+
+        try {
+          const savedChats = JSON.parse(localStorage.getItem(STORAGE_KEYS.CHATS) || '[]');
+          if (Array.isArray(savedChats)) {
+            state.chats = savedChats;
+          }
+        } catch (e) {
+          state.chats = [];
+        }
+
+        try {
+          const activeId = localStorage.getItem(STORAGE_KEYS.ACTIVE_CHAT);
+          if (activeId && state.chats.some((c) => c.id === activeId)) {
+            state.activeChatId = activeId;
+          } else if (state.chats.length > 0) {
+            state.activeChatId = state.chats[0].id;
+          }
+        } catch (e) {}
+      }
+
+      function saveChats() {
+        try {
+          localStorage.setItem(STORAGE_KEYS.CHATS, JSON.stringify(state.chats));
+          if (state.activeChatId) {
+            localStorage.setItem(STORAGE_KEYS.ACTIVE_CHAT, state.activeChatId);
+          } else {
+            localStorage.removeItem(STORAGE_KEYS.ACTIVE_CHAT);
+          }
+        } catch (e) {}
+      }
+
+      function saveSettings() {
+        try {
+          localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(state.settings));
+        } catch (e) {}
+      }
+
+      function saveUser(userObj) {
+        state.user = userObj;
+        try {
+          if (userObj) {
+            localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(userObj));
+          } else {
+            localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+          }
+        } catch (e) {}
+      }
+
+      // =====================================================================
+      // 4. Toast Notification Helper
+      // =====================================================================
+      let toastTimer = null;
+      function showToast(msg, variant) {
+        const el = $('toast-banner');
+        if (!el) return;
+        el.textContent = msg;
+        el.className =
+          'fixed top-18 left-1/2 -translate-x-1/2 z-50 max-w-xs sm:max-w-sm px-4 py-2.5 rounded-full border text-xs font-medium shadow-md transition-all ' +
+          (variant === 'error'
+            ? 'bg-rose-50 border-rose-200 text-rose-800'
+            : 'bg-gray-900 border-gray-800 text-white');
+        el.classList.remove('hidden');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          el.classList.add('hidden');
+        }, 3200);
+      }
+
+      // =====================================================================
+      // 5. Andaz (Conversational Style) Detection & Helpers
+      // =====================================================================
+      function detectAndaz(text, explicitStyle) {
+        if (explicitStyle && explicitStyle !== 'auto') return explicitStyle;
+        const clean = (text || '').trim();
+        if (!clean) return 'auto';
+        // Urdu / Arabic script detection
+        if (/[\u0600-\u06FF]/.test(clean)) return 'urdu';
+        // Roman Urdu keyword detection
+        if (/\b(kya|kaise|hai|hain|karo|batao|mujhe|mera|apna|acha|shukriya|salam|assalam|bhai|yaar|likho|samjhao)\b/i.test(clean)) {
+          return 'roman_urdu';
+        }
+        // Code detection
+        if (/```|\b(function|const|let|var|import|def |class |html|css|javascript|python|react|sql)\b/i.test(clean)) {
+          return 'coding';
+        }
+        return 'auto';
+      }
+
+      function getActiveChat() {
+        return state.chats.find((c) => c.id === state.activeChatId) || null;
+      }
+
+      function createNewChat(initialAndaz) {
+        const chat = {
+          id: 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          title: 'New Chat',
+          style: initialAndaz || state.pendingAndaz || 'auto',
+          updatedAt: Date.now(),
+          messages: [],
+        };
+        state.chats.unshift(chat);
+        state.activeChatId = chat.id;
+        saveChats();
+        return chat;
+      }
+
+      function startFreshChat() {
+        if (state.isStreaming && state.abortController) {
+          state.abortController.abort();
+        }
+        state.activeChatId = null;
+        state.pendingAndaz = 'auto';
+        saveChats();
+        renderSidebarHistory();
+        renderChatView();
+        updateStyleIndicator();
+      }
+
+      function updateStyleIndicator() {
+        const active = getActiveChat();
+        const styleKey = active ? active.style || 'auto' : state.pendingAndaz || 'auto';
+        const label = ANDAZ_LABELS[styleKey] || 'Auto-Detect';
+        const el = $('active-chat-style-indicator');
+        if (el) el.textContent = '✦ Andaz: ' + label;
+      }
+
+      // =====================================================================
+      // 6. Auth UI Sync (Signed In vs Signed Out)
+      // =====================================================================
+      function getInitials(name) {
+        const parts = (name || 'SA').trim().split(/\s+/);
+        if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+        return (parts[0] || 'SA').slice(0, 2).toUpperCase();
+      }
+
+      function syncAuthUI() {
+        const signedIn = Boolean(state.user && state.user.email);
+        const displayName = signedIn ? state.user.name || state.user.email.split('@')[0] : 'Guest Mode (Tap to Sign In)';
+        const initials = signedIn ? getInitials(displayName) : 'SA';
+
+        const headerAuthGroup = $('header-auth-group');
+        const cosmoPlusPill = $('cosmo-plus-pill');
+        const sidebarSigninCard = $('sidebar-signin-card');
+        const sidebarInitials = $('sidebar-avatar-initials');
+        const settingsInitials = $('settings-avatar-initials');
+        const settingsName = $('settings-account-name');
+        const settingsEmail = $('settings-account-email');
+
+        if (signedIn) {
+          headerAuthGroup.classList.add('hidden');
+          cosmoPlusPill.classList.remove('hidden');
+          sidebarSigninCard.classList.add('hidden');
+          if (settingsEmail) {
+            settingsEmail.textContent = state.user.email + (state.user.provider ? ' · ' + state.user.provider : '');
+            settingsEmail.classList.remove('hidden');
+          }
+        } else {
+          headerAuthGroup.classList.remove('hidden');
+          cosmoPlusPill.classList.add('hidden');
+          sidebarSigninCard.classList.remove('hidden');
+          if (settingsEmail) settingsEmail.classList.add('hidden');
+        }
+
+        if (sidebarInitials) sidebarInitials.textContent = initials;
+        if (settingsInitials) settingsInitials.textContent = initials;
+        if (settingsName) settingsName.textContent = displayName;
+      }
+
+      function openAuthModal(mode) {
+        state.authMode = mode === 'signup' ? 'signup' : 'login';
+        const isSignup = state.authMode === 'signup';
+        $('signin-modal-title').textContent = isSignup ? 'Create your account' : 'Welcome back';
+        $('signin-modal-subtitle').textContent = isSignup
+          ? 'Sign up for Cosmo AI by Sadeed Ahmad Hashmi'
+          : 'Log in to access your Cosmo AI workspace';
+        $('signin-name-wrap').classList.toggle('hidden', !isSignup);
+        $('auth-tab-login').className = isSignup
+          ? 'py-1.5 rounded-full text-gray-500 hover:text-gray-900 transition cursor-pointer'
+          : 'py-1.5 rounded-full bg-white text-gray-900 shadow-2xs transition cursor-pointer';
+        $('auth-tab-signup').className = isSignup
+          ? 'py-1.5 rounded-full bg-white text-gray-900 shadow-2xs transition cursor-pointer'
+          : 'py-1.5 rounded-full text-gray-500 hover:text-gray-900 transition cursor-pointer';
+
+        const modal = $('signin-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+
+      function closeAuthModal() {
+        const modal = $('signin-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+
+      // =====================================================================
+      // 7. Sidebar Open / Close & History Rendering
+      // =====================================================================
+      function openSidebar() {
+        $('sidebar').classList.remove('-translate-x-full');
+        $('sidebar-backdrop').classList.remove('hidden');
+      }
+
+      function closeSidebar() {
+        $('sidebar').classList.add('-translate-x-full');
+        $('sidebar-backdrop').classList.add('hidden');
+      }
+
+      function renderSidebarHistory() {
+        const listEl = $('chat-history-list');
+        const seeAllBtn = $('see-all-chats-btn');
+        if (!listEl) return;
+
+        const query = state.searchQuery.trim().toLowerCase();
+        const filtered = query
+          ? state.chats.filter(
+              (c) =>
+                (c.title || '').toLowerCase().includes(query) ||
+                (c.messages || []).some((m) => (m.content || '').toLowerCase().includes(query))
+            )
+          : state.chats;
+
+        if (filtered.length === 0) {
+          listEl.innerHTML =
+            '<div class="px-3 py-4 text-xs text-gray-400 text-center">' +
+            (query ? 'No matching chats found.' : 'Your saved conversations will appear here.') +
+            '</div>';
+          seeAllBtn.classList.add('hidden');
+          return;
+        }
+
+        const visible = state.showAllChats || query ? filtered : filtered.slice(0, 6);
+        listEl.innerHTML = '';
+
+        visible.forEach((chat) => {
+          const isActive = chat.id === state.activeChatId;
+          const isUrdu = /[\u0600-\u06FF]/.test(chat.title || '');
+          const andazLabel = ANDAZ_LABELS[chat.style || 'auto'] || 'Auto-Detect';
+
+          const row = document.createElement('div');
+          row.className =
+            'group flex items-center justify-between gap-2 px-3 py-2.5 rounded-2xl transition cursor-pointer ' +
+            (isActive ? 'bg-gray-100 text-gray-900' : 'hover:bg-gray-100/75 text-gray-800');
+
+          const infoBtn = document.createElement('button');
+          infoBtn.type = 'button';
+          infoBtn.className = 'flex-1 min-w-0 text-left cursor-pointer';
+          infoBtn.innerHTML =
+            '<div dir="' +
+            (isUrdu ? 'rtl' : 'auto') +
+            '" class="text-[14px] font-medium truncate">' +
+            escapeHtml(chat.title || 'Untitled Chat') +
+            '</div>' +
+            '<div class="text-[10px] text-cosmo-blue font-medium mt-0.5 truncate">✦ ' +
+            escapeHtml(andazLabel) +
+            '</div>';
+
+          infoBtn.addEventListener('click', () => {
+            state.activeChatId = chat.id;
+            state.pendingAndaz = chat.style || 'auto';
+            saveChats();
+            renderSidebarHistory();
+            renderChatView();
+            updateStyleIndicator();
+            closeSidebar();
+            showToast('Restored chat & Andaz: ' + andazLabel);
+          });
+
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.className =
+            'w-7 h-7 rounded-full opacity-70 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-gray-200 text-gray-500 hover:text-rose-600 flex items-center justify-center text-xs transition cursor-pointer shrink-0';
+          delBtn.title = 'Delete chat';
+          delBtn.textContent = '✕';
+          delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.chats = state.chats.filter((c) => c.id !== chat.id);
+            if (state.activeChatId === chat.id) {
+              state.activeChatId = state.chats.length > 0 ? state.chats[0].id : null;
+            }
+            saveChats();
+            renderSidebarHistory();
+            renderChatView();
+            updateStyleIndicator();
+            showToast('Conversation deleted');
+          });
+
+          row.appendChild(infoBtn);
+          row.appendChild(delBtn);
+          listEl.appendChild(row);
+        });
+
+        if (!query && filtered.length > 6) {
+          seeAllBtn.classList.remove('hidden');
+          seeAllBtn.textContent = state.showAllChats ? 'Show less' : 'See all... (' + filtered.length + ')';
+        } else {
+          seeAllBtn.classList.add('hidden');
+        }
+      }
+
+      // =====================================================================
+      // 8. Markdown Formatter & Message Thread Rendering
+      // =====================================================================
+      function escapeHtml(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function renderMarkdown(rawText) {
+        const text = String(rawText || '');
+        const codeBlocks = [];
+        let processed = text.replace(/```([\w-]*)\n([\s\S]*?)```/g, (_, lang, code) => {
+          const idx = codeBlocks.length;
+          codeBlocks.push(
+            '<div class="my-2.5 rounded-2xl overflow-hidden border border-gray-200 bg-gray-900 text-gray-100">' +
+              '<div class="px-3.5 py-1.5 bg-gray-800 text-[11px] font-mono text-gray-300 flex items-center justify-between">' +
+              '<span>' +
+              escapeHtml(lang || 'code') +
+              '</span>' +
+              '<button type="button" data-copy-code="' +
+              idx +
+              '" class="copy-code-btn text-blue-300 hover:text-white cursor-pointer">Copy</button>' +
+              '</div>' +
+              '<pre class="p-3.5 text-xs font-mono overflow-x-auto leading-relaxed"><code>' +
+              escapeHtml(code.trim()) +
+              '</code></pre>' +
+              '</div>'
+          );
+          return '@@CODEBLOCK_' + idx + '@@';
+        });
+
+        processed = escapeHtml(processed);
+
+        // Inline formatting
+        processed = processed
+          .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+          .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+          .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+          .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+          .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+        // Lists & paragraphs
+        const lines = processed.split('\n');
+        const htmlLines = [];
+        let inUl = false;
+        let inOl = false;
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (/^@@CODEBLOCK_\d+@@$/.test(line)) {
+            if (inUl) { htmlLines.push('</ul>'); inUl = false; }
+            if (inOl) { htmlLines.push('</ol>'); inOl = false; }
+            htmlLines.push(line);
+          } else if (/^[-*•] (.+)$/.test(line)) {
+            if (inOl) { htmlLines.push('</ol>'); inOl = false; }
+            if (!inUl) { htmlLines.push('<ul>'); inUl = true; }
+            htmlLines.push('<li>' + line.replace(/^[-*•] /, '') + '</li>');
+          } else if (/^\d+\.\s+(.+)$/.test(line)) {
+            if (inUl) { htmlLines.push('</ul>'); inUl = false; }
+            if (!inOl) { htmlLines.push('<ol>'); inOl = true; }
+            htmlLines.push('<li>' + line.replace(/^\d+\.\s+/, '') + '</li>');
+          } else {
+            if (inUl) { htmlLines.push('</ul>'); inUl = false; }
+            if (inOl) { htmlLines.push('</ol>'); inOl = false; }
+            if (!line) {
+              continue;
+            } else if (/^<(h1|h2|h3|blockquote)/.test(line)) {
+              htmlLines.push(line);
+            } else {
+              htmlLines.push('<p>' + line + '</p>');
+            }
+          }
+        }
+        if (inUl) htmlLines.push('</ul>');
+        if (inOl) htmlLines.push('</ol>');
+
+        let finalHtml = htmlLines.join('\n');
+        codeBlocks.forEach((block, idx) => {
+          finalHtml = finalHtml.replace('@@CODEBLOCK_' + idx + '@@', block);
+        });
+        return finalHtml;
+      }
+
+      function renderChatView() {
+        const emptyState = $('empty-state');
+        const messageList = $('message-list');
+        const activeChat = getActiveChat();
+
+        if (!activeChat || activeChat.messages.length === 0) {
+          emptyState.classList.remove('hidden');
+          messageList.classList.add('hidden');
+          messageList.innerHTML = '';
+          return;
+        }
+
+        emptyState.classList.add('hidden');
+        messageList.classList.remove('hidden');
+        messageList.innerHTML = '';
+
+        activeChat.messages.forEach((msg, idx) => {
+          const isUser = msg.role === 'user';
+          const wrapper = document.createElement('div');
+          wrapper.className = isUser ? 'flex justify-end' : 'flex items-start gap-3';
+
+          if (isUser) {
+            const bubble = document.createElement('div');
+            bubble.setAttribute('dir', 'auto');
+            bubble.className =
+              'max-w-[85%] sm:max-w-[75%] rounded-3xl bg-[#F3F4F6] text-gray-900 px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap break-words';
+            bubble.textContent = msg.content;
+            wrapper.appendChild(bubble);
+          } else {
+            // Assistant Avatar
+            const avatar = document.createElement('div');
+            avatar.className =
+              'w-8 h-8 rounded-full bg-cosmo-skyBg text-cosmo-blue flex items-center justify-center shrink-0 mt-0.5';
+            avatar.innerHTML =
+              '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5L14.1 9.9L21.5 12L14.1 14.1L12 21.5L9.9 14.1L2.5 12L9.9 9.9L12 2.5Z" /></svg>';
+
+            const bodyCol = document.createElement('div');
+            bodyCol.className = 'flex-1 min-w-0 space-y-2';
+
+            // Optional Leo Star Thinking Reasoning Drawer
+            if (msg.thinking) {
+              const details = document.createElement('details');
+              details.className = 'rounded-2xl bg-blue-50/70 border border-blue-100 px-3.5 py-2 text-xs text-gray-700';
+              details.innerHTML =
+                '<summary class="font-semibold text-cosmo-blue cursor-pointer select-none flex items-center gap-1.5">' +
+                '<span>✦ Leo Star Thinking</span>' +
+                '</summary>' +
+                '<div dir="auto" class="mt-2 pt-2 border-t border-blue-100/80 text-gray-600 leading-relaxed whitespace-pre-wrap">' +
+                escapeHtml(msg.thinking) +
+                '</div>';
+              bodyCol.appendChild(details);
+            }
+
+            // Main Prose Content
+            const contentDiv = document.createElement('div');
+            contentDiv.setAttribute('dir', 'auto');
+            contentDiv.className = 'message-prose text-[15px] break-words';
+            if (msg.isLoading && !msg.content) {
+              contentDiv.innerHTML =
+                '<div class="inline-flex items-center gap-1.5 py-2 px-1">' +
+                '<span class="typing-dot w-2 h-2 rounded-full bg-cosmo-blue"></span>' +
+                '<span class="typing-dot w-2 h-2 rounded-full bg-cosmo-blue"></span>' +
+                '<span class="typing-dot w-2 h-2 rounded-full bg-cosmo-blue"></span>' +
+                '</div>';
+            } else {
+              contentDiv.innerHTML = renderMarkdown(msg.content);
+            }
+            bodyCol.appendChild(contentDiv);
+
+            // Message Action Bar (Copy & Read Aloud)
+            if (!msg.isLoading && msg.content) {
+              const actions = document.createElement('div');
+              actions.className = 'flex items-center gap-2 pt-0.5 text-[11px] text-gray-400';
+
+              const copyBtn = document.createElement('button');
+              copyBtn.type = 'button';
+              copyBtn.className = 'hover:text-gray-700 px-2 py-1 rounded-lg hover:bg-gray-100 transition cursor-pointer';
+              copyBtn.textContent = 'Copy';
+              copyBtn.addEventListener('click', () => {
+                copyTextToClipboard(msg.content);
+                showToast('Response copied to clipboard');
+              });
+
+              const speakBtn = document.createElement('button');
+              speakBtn.type = 'button';
+              speakBtn.className = 'hover:text-cosmo-blue px-2 py-1 rounded-lg hover:bg-blue-50 transition cursor-pointer';
+              speakBtn.textContent = '🔊 Speak';
+              speakBtn.addEventListener('click', () => {
+                speakText(msg.content);
+              });
+
+              actions.appendChild(copyBtn);
+              actions.appendChild(speakBtn);
+              bodyCol.appendChild(actions);
+            }
+
+            wrapper.appendChild(avatar);
+            wrapper.appendChild(bodyCol);
+          }
+
+          messageList.appendChild(wrapper);
+        });
+
+        // Attach code-copy listeners
+        messageList.querySelectorAll('.copy-code-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const pre = btn.closest('div').nextElementSibling;
+            if (pre) {
+              copyTextToClipboard(pre.textContent || '');
+              showToast('Code copied');
+            }
+          });
+        });
+
+        const container = $('messages-container');
+        container.scrollTop = container.scrollHeight;
+      }
+
+      function copyTextToClipboard(text) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        } catch (e) {}
+      }
+
+      // =====================================================================
+      // 9. Dynamic Royal Blue Button Controller & Input Auto-Resize
+      // =====================================================================
+      function syncBlueButtonState() {
+        const input = $('prompt-input');
+        const btn = $('blue-action-btn');
+        const iconWave = $('icon-wave');
+        const iconSend = $('icon-send');
+        const iconStop = $('icon-stop');
+        if (!input || !btn) return;
+
+        // Auto-resize textarea
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 144) + 'px';
+
+        const hasText = input.value.trim().length > 0 || Boolean(state.attachedDoc);
+
+        iconWave.classList.add('hidden');
+        iconSend.classList.add('hidden');
+        iconStop.classList.add('hidden');
+
+        if (state.isStreaming) {
+          btn.dataset.mode = 'stop';
+          btn.title = 'Stop Generating';
+          btn.setAttribute('aria-label', 'Stop Generating');
+          iconStop.classList.remove('hidden');
+        } else if (hasText) {
+          btn.dataset.mode = 'send';
+          btn.title = 'Send Message';
+          btn.setAttribute('aria-label', 'Send Message');
+          iconSend.classList.remove('hidden');
+        } else {
+          btn.dataset.mode = 'live';
+          btn.title = 'Go Live Voice Chat';
+          btn.setAttribute('aria-label', 'Go Live Voice Chat');
+          iconWave.classList.remove('hidden');
+        }
+      }
+
+      // =====================================================================
+      // 10. Word-to-Text (.docx / .txt / .md) Extractor with Offline Fallback
+      // =====================================================================
+      async function extractDocxText(arrayBuffer) {
+        let xmlString = '';
+
+        // Primary: JSZip if loaded
+        if (window.JSZip) {
+          try {
+            const zip = await window.JSZip.loadAsync(arrayBuffer);
+            const docFile = zip.file('word/document.xml');
+            if (docFile) {
+              xmlString = await docFile.async('string');
+            }
+          } catch (e) {
+            xmlString = '';
+          }
+        }
+
+        // Fallback: Pure-JS ZIP local file header scanner + DecompressionStream('deflate-raw')
+        if (!xmlString && typeof DecompressionStream !== 'undefined') {
+          try {
+            const bytes = new Uint8Array(arrayBuffer);
+            const view = new DataView(arrayBuffer);
+            let offset = 0;
+            while (offset + 30 < bytes.length) {
+              if (view.getUint32(offset, true) !== 0x04034b50) break;
+              const compression = view.getUint16(offset + 8, true);
+              const compressedSize = view.getUint32(offset + 18, true);
+              const nameLen = view.getUint16(offset + 26, true);
+              const extraLen = view.getUint16(offset + 28, true);
+              const fileName = new TextDecoder().decode(bytes.slice(offset + 30, offset + 30 + nameLen));
+              const dataStart = offset + 30 + nameLen + extraLen;
+              const dataEnd = dataStart + compressedSize;
+
+              if (fileName === 'word/document.xml' && dataEnd <= bytes.length) {
+                const rawSlice = bytes.slice(dataStart, dataEnd);
+                if (compression === 0) {
+                  xmlString = new TextDecoder().decode(rawSlice);
+                } else if (compression === 8) {
+                  const ds = new DecompressionStream('deflate-raw');
+                  const writer = ds.writable.getWriter();
+                  writer.write(rawSlice);
+                  writer.close();
+                  const decompressedBuf = await new Response(ds.readable).arrayBuffer();
+                  xmlString = new TextDecoder().decode(decompressedBuf);
+                }
+                break;
+              }
+              offset = dataEnd;
+            }
+          } catch (e) {}
+        }
+
+        if (!xmlString) {
+          throw new Error('Could not parse .docx XML structure.');
+        }
+
+        // Parse XML paragraphs (<w:p>) and text runs (<w:t>) cleanly
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlString, 'application/xml');
+        const paragraphs = Array.from(xmlDoc.getElementsByTagNameNS('*', 'p'));
+        if (paragraphs.length > 0) {
+          return paragraphs
+            .map((p) => {
+              const texts = Array.from(p.getElementsByTagNameNS('*', 't')).map((t) => t.textContent || '');
+              return texts.join('');
+            })
+            .filter((line) => line.trim().length > 0)
+            .join('\n\n');
+        }
+
+        return (xmlDoc.documentElement.textContent || '').trim();
+      }
+
+      async function handleDocumentFile(file) {
+        if (!file) return;
+        const name = file.name || 'document.txt';
+        const lower = name.toLowerCase();
+
+        try {
+          let extracted = '';
+          if (lower.endsWith('.docx')) {
+            const buf = await file.arrayBuffer();
+            extracted = await extractDocxText(buf);
+          } else {
+            extracted = await file.text();
+          }
+
+          extracted = (extracted || '').trim();
+          if (!extracted) {
+            showToast('No readable text found in ' + name, 'error');
+            return;
+          }
+
+          state.attachedDoc = {
+            name: name,
+            text: extracted,
+          };
+
+          if (!getActiveChat()) {
+            state.pendingAndaz = 'document';
+            updateStyleIndicator();
+          }
+
+          renderAttachedDocUI();
+          syncBlueButtonState();
+          showToast('Extracted text from ' + name);
+        } catch (err) {
+          showToast('Unable to read document: ' + (err.message || 'Invalid file'), 'error');
+        }
+      }
+
+      function renderAttachedDocUI() {
+        const wrap = $('word-doc-attachment');
+        if (!state.attachedDoc) {
+          wrap.classList.add('hidden');
+          return;
+        }
+        const text = state.attachedDoc.text || '';
+        const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+        $('word-doc-filename').textContent = state.attachedDoc.name;
+        $('word-doc-stats').textContent = words + ' words · ' + text.length + ' chars';
+        $('word-doc-textarea').value = text;
+        $('word-doc-char-count').textContent = text.length + ' chars';
+        wrap.classList.remove('hidden');
+      }
+
+      // =====================================================================
+      // 11. OpenRouter AI Streaming & Automatic Fallback Engine
+      // =====================================================================
+      function getApiKey() {
+        try {
+          return (localStorage.getItem(STORAGE_KEYS.API_KEY) || '').trim();
+        } catch (e) {
+          return '';
+        }
+      }
+
+      function isApiKeyLocked() {
+        try {
+          return localStorage.getItem(STORAGE_KEYS.API_KEY_LOCKED) === 'true' && Boolean(getApiKey());
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function syncFirstTimeApiCard() {
+        const card = $('first-time-api-card');
+        if (!card) return;
+        if (isApiKeyLocked()) {
+          card.remove();
+        } else {
+          card.classList.remove('hidden');
+        }
+      }
+
+      function handleFirstTimeApiSave() {
+        const input = $('first-time-api-input');
+        const errEl = $('first-time-api-error');
+        const card = $('first-time-api-card');
+        if (!input) return;
+
+        const key = (input.value || '').trim();
+        if (!key || key.length < 12) {
+          if (errEl) {
+            errEl.textContent = 'Please enter a valid OpenRouter API key (e.g., sk-or-v1-...).';
+            errEl.classList.remove('hidden');
+          }
+          showToast('Please enter a valid OpenRouter API key', 'error');
+          return;
+        }
+
+        try {
+          localStorage.setItem(STORAGE_KEYS.API_KEY, key);
+          localStorage.setItem(STORAGE_KEYS.API_KEY_LOCKED, 'true');
+        } catch (e) {
+          if (errEl) {
+            errEl.textContent = 'Unable to save key to browser storage.';
+            errEl.classList.remove('hidden');
+          }
+          return;
+        }
+
+        if (card) {
+          card.remove();
+        }
+        showToast('OpenRouter API key saved and permanently locked');
+      }
+
+      function buildSystemPrompt(chatStyle) {
+        const lens = LENS_CONFIG[state.settings.lens] || LENS_CONFIG.fusion;
+        const andazDesc = ANDAZ_LABELS[chatStyle || 'auto'] || 'Auto-Detect';
+        let prompt =
+          BASE_SYSTEM_PROMPT +
+          '\nActive Intelligence Lens: ' +
+          lens.label +
+          ' — ' +
+          lens.directive +
+          '\nConversation Starting Andaz (Style): ' +
+          andazDesc +
+          '. Maintain this style consistently throughout the thread.';
+
+        if (state.settings.leoThinking) {
+          prompt +=
+            '\nLeo Star Thinking Mode is ON: Before giving your final answer, briefly output a <leo_thinking>...</leo_thinking> block showing your structured first-principles reasoning, then provide the polished response outside the tags.';
+        }
+        return prompt;
+      }
+
+      async function requestOpenRouterCompletion(messagesPayload, primaryModel, signal) {
+        const apiKey = getApiKey();
+        if (!apiKey) {
+          throw new Error('OpenRouter API key is missing. Please enter your API key in the setup card first.');
+        }
+        const modelsToTry = [primaryModel].concat(FALLBACK_MODELS.filter((m) => m !== primaryModel));
+        let lastError = null;
+
+        for (let i = 0; i < modelsToTry.length; i++) {
+          const modelId = modelsToTry[i];
+          try {
+            const response = await fetch(OPENROUTER_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + apiKey,
+                'HTTP-Referer': window.location.origin || 'https://cosmo-ai.local',
+                'X-Title': 'Cosmo AI by Sadeed Ahmad Hashmi',
+              },
+              body: JSON.stringify({
+                model: modelId,
+                messages: messagesPayload,
+                stream: true,
+              }),
+              signal: signal,
+            });
+
+            if (!response.ok) {
+              const errBody = await response.text().catch(() => '');
+              lastError = new Error('HTTP ' + response.status + ': ' + errBody.slice(0, 140));
+              if (response.status === 401) break; // Invalid key won't recover on fallback
+              continue;
+            }
+
+            return response;
+          } catch (err) {
+            if (err && err.name === 'AbortError') throw err;
+            lastError = err;
+          }
+        }
+
+        throw lastError || new Error('Unable to connect to OpenRouter.');
+      }
+
+      async function sendMessage(customText, options) {
+        const opts = options || {};
+        const inputEl = $('prompt-input');
+        let rawInput = typeof customText === 'string' ? customText : inputEl.value;
+        rawInput = rawInput.trim();
+
+        // Combine attached Word document if present
+        let fullUserPrompt = rawInput;
+        let displayUserPrompt = rawInput;
+        if (state.attachedDoc) {
+          const docHeader = '[Attached Document: ' + state.attachedDoc.name + ']';
+          displayUserPrompt = rawInput ? docHeader + '\n\n' + rawInput : docHeader;
+          fullUserPrompt =
+            'Extracted content from "' +
+            state.attachedDoc.name +
+            '":\n"""\n' +
+            state.attachedDoc.text +
+            '\n"""\n\n' +
+            (rawInput || 'Please summarize, analyze, and extract key points from this document.');
+          state.attachedDoc = null;
+          renderAttachedDocUI();
+        }
+
+        if (!fullUserPrompt || state.isStreaming) return;
+
+        // Clear input box immediately
+        if (typeof customText !== 'string') {
+          inputEl.value = '';
+        }
+
+        // Ensure active chat & capture starting Andaz
+        let chat = getActiveChat();
+        if (!chat) {
+          const detected = detectAndaz(rawInput || fullUserPrompt, opts.style || state.pendingAndaz);
+          chat = createNewChat(detected);
+        }
+
+        if (chat.messages.length === 0) {
+          chat.title = (rawInput || displayUserPrompt).replace(/\s+/g, ' ').slice(0, 44);
+          if (opts.style && opts.style !== 'auto') {
+            chat.style = opts.style;
+          }
+        }
+
+        chat.messages.push({
+          role: 'user',
+          content: displayUserPrompt,
+          apiContent: fullUserPrompt,
+          timestamp: Date.now(),
+        });
+
+        const assistantMsg = {
+          role: 'assistant',
+          content: '',
+          thinking: '',
+          isLoading: true,
+          timestamp: Date.now(),
+        };
+        chat.messages.push(assistantMsg);
+        chat.updatedAt = Date.now();
+
+        state.isStreaming = true;
+        state.abortController = new AbortController();
+        saveChats();
+        renderSidebarHistory();
+        renderChatView();
+        updateStyleIndicator();
+        syncBlueButtonState();
+
+        if (opts.onLivePhase) opts.onLivePhase('Thinking', 'Cosmo AI is thinking...');
+
+        const lens = LENS_CONFIG[state.settings.lens] || LENS_CONFIG.fusion;
+        const apiMessages = [{ role: 'system', content: buildSystemPrompt(chat.style) }].concat(
+          chat.messages.slice(0, -1).map((m) => ({
+            role: m.role,
+            content: m.apiContent || m.content,
+          }))
+        );
+
+        let rawAccumulated = '';
+
+        try {
+          const response = await requestOpenRouterCompletion(
+            apiMessages,
+            lens.model,
+            state.abortController.signal
+          );
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let sseBuffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            sseBuffer += decoder.decode(value, { stream: true });
+
+            const lines = sseBuffer.split('\n');
+            sseBuffer = lines.pop() || '';
+
+            for (let i = 0; i < lines.length; i++) {
+              const trimmed = lines[i].trim();
+              if (!trimmed || !trimmed.startsWith('data:')) continue;
+              const dataStr = trimmed.slice(5).trim();
+              if (dataStr === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(dataStr);
+                const delta =
+                  parsed.choices &&
+                  parsed.choices[0] &&
+                  parsed.choices[0].delta &&
+                  parsed.choices[0].delta.content;
+                if (delta) {
+                  rawAccumulated += delta;
+                  parseLeoThinkingStream(rawAccumulated, assistantMsg);
+                  renderChatView();
+                  if (opts.onLiveCaption) {
+                    opts.onLiveCaption(assistantMsg.content.slice(-160) || 'Thinking...');
+                  }
+                }
+              } catch (e) {}
+            }
+          }
+
+          if (!assistantMsg.content && rawAccumulated) {
+            parseLeoThinkingStream(rawAccumulated, assistantMsg);
+          }
+          if (!assistantMsg.content) {
+            assistantMsg.content = 'I am ready. How can Cosmo AI assist you further?';
+          }
+        } catch (err) {
+          if (err && err.name === 'AbortError') {
+            assistantMsg.content = assistantMsg.content || '_Generation stopped._';
+          } else {
+            assistantMsg.content =
+              '⚠️ **Connection Notice:** ' +
+              escapeHtml(err && err.message ? err.message : 'Network error') +
+              '\n\nPlease check your internet connection and try again.';
+            showToast('Request failed — check network', 'error');
+          }
+        } finally {
+          assistantMsg.isLoading = false;
+          state.isStreaming = false;
+          state.abortController = null;
+          chat.updatedAt = Date.now();
+          saveChats();
+          renderSidebarHistory();
+          renderChatView();
+          syncBlueButtonState();
+
+          if (opts.onLiveComplete) {
+            opts.onLiveComplete(assistantMsg.content);
+          } else if (state.settings.autoSpeak && assistantMsg.content) {
+            speakText(assistantMsg.content);
+          }
+        }
+      }
+
+      function parseLeoThinkingStream(raw, targetMsg) {
+        const openTag = '<leo_thinking>';
+        const closeTag = '</leo_thinking>';
+        const startIdx = raw.indexOf(openTag);
+        if (startIdx !== -1) {
+          const endIdx = raw.indexOf(closeTag, startIdx + openTag.length);
+          if (endIdx !== -1) {
+            targetMsg.thinking = raw.slice(startIdx + openTag.length, endIdx).trim();
+            targetMsg.content = (raw.slice(0, startIdx) + raw.slice(endIdx + closeTag.length)).trim();
+          } else {
+            targetMsg.thinking = raw.slice(startIdx + openTag.length).trim();
+            targetMsg.content = raw.slice(0, startIdx).trim();
+          }
+        } else {
+          targetMsg.content = raw;
+        }
+      }
+
+      // =====================================================================
+      // 12. Voice Dictation & Cosmo Go Live Conversational Mode
+      // =====================================================================
+      function speakText(text, onEndCallback) {
+        if (!('speechSynthesis' in window)) {
+          if (onEndCallback) onEndCallback();
+          return;
+        }
+        try {
+          window.speechSynthesis.cancel();
+          const clean = String(text || '')
+            .replace(/```[\s\S]*?```/g, 'Code block.')
+            .replace(/[*#_`>]/g, '')
+            .trim();
+          if (!clean) {
+            if (onEndCallback) onEndCallback();
+            return;
+          }
+          const utter = new SpeechSynthesisUtterance(clean);
+          utter.lang = /[\u0600-\u06FF]/.test(clean) ? 'ur-PK' : 'en-US';
+          utter.rate = 1.02;
+          utter.onend = () => {
+            if (onEndCallback) onEndCallback();
+          };
+          utter.onerror = () => {
+            if (onEndCallback) onEndCallback();
+          };
+          window.speechSynthesis.speak(utter);
+        } catch (e) {
+          if (onEndCallback) onEndCallback();
+        }
+      }
+
+      function toggleDictation() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          showToast('Voice dictation is not supported in this browser.', 'error');
+          return;
+        }
+
+        if (state.isDictating && state.dictationRec) {
+          state.dictationRec.stop();
+          return;
+        }
+
+        const rec = new SpeechRecognition();
+        rec.lang = 'en-US';
+        rec.interimResults = true;
+        rec.continuous = false;
+
+        const baseText = $('prompt-input').value;
+
+        rec.onstart = () => {
+          state.isDictating = true;
+          $('dictate-btn').classList.add('bg-rose-100', 'text-rose-600');
+          showToast('Listening... Speak now');
+        };
+
+        rec.onresult = (event) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          $('prompt-input').value = (baseText ? baseText + ' ' : '') + transcript.trim();
+          syncBlueButtonState();
+        };
+
+        rec.onerror = () => {
+          state.isDictating = false;
+          $('dictate-btn').classList.remove('bg-rose-100', 'text-rose-600');
+        };
+
+        rec.onend = () => {
+          state.isDictating = false;
+          state.dictationRec = null;
+          $('dictate-btn').classList.remove('bg-rose-100', 'text-rose-600');
+          syncBlueButtonState();
+        };
+
+        state.dictationRec = rec;
+        rec.start();
+      }
+
+      function setLiveVisualState(phase, captionText) {
+        $('live-phase-label').textContent = phase;
+        if (captionText) $('live-caption').textContent = captionText;
+        const orb = $('live-orb');
+        const wave = $('live-waveform');
+        if (phase === 'Listening' || phase === 'Speaking') {
+          orb.classList.add('live-orb-active');
+          wave.classList.add('live-wave-running');
+        } else {
+          orb.classList.remove('live-orb-active');
+          wave.classList.remove('live-wave-running');
+        }
+      }
+
+      function appendLiveTranscript(role, text) {
+        const feed = $('live-transcript-feed');
+        const item = document.createElement('div');
+        item.className = role === 'user' ? 'text-gray-800 font-medium' : 'text-cosmo-blue';
+        item.setAttribute('dir', 'auto');
+        item.textContent = (role === 'user' ? 'You: ' : 'Cosmo AI: ') + text;
+        feed.appendChild(item);
+        feed.scrollTop = feed.scrollHeight;
+      }
+
+      function openGoLive() {
+        state.isLiveActive = true;
+        state.liveMuted = false;
+        $('live-lens-select').value = state.settings.lens;
+        $('live-transcript-feed').innerHTML = '';
+        const overlay = $('go-live-overlay');
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        setLiveVisualState('Listening', 'Speak naturally to Cosmo AI...');
+        startLiveRecognition();
+      }
+
+      function closeGoLive() {
+        state.isLiveActive = false;
+        if (state.liveRec) {
+          try { state.liveRec.stop(); } catch (e) {}
+          state.liveRec = null;
+        }
+        if ('speechSynthesis' in window) {
+          try { window.speechSynthesis.cancel(); } catch (e) {}
+        }
+        const overlay = $('go-live-overlay');
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+      }
+
+      function startLiveRecognition() {
+        if (!state.isLiveActive || state.liveMuted) return;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          setLiveVisualState('Ready', 'Type a message below to talk in Live mode.');
+          return;
+        }
+
+        if (state.liveRec) {
+          try { state.liveRec.stop(); } catch (e) {}
+        }
+
+        const rec = new SpeechRecognition();
+        rec.lang = 'en-US';
+        rec.interimResults = true;
+        rec.continuous = false;
+        let finalSpeech = '';
+
+        rec.onstart = () => {
+          setLiveVisualState('Listening', 'Listening...');
+        };
+
+        rec.onresult = (event) => {
+          let interim = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const t = event.results[i][0].transcript;
+            if (event.results[i].isFinal) finalSpeech += t;
+            else interim += t;
+          }
+          $('live-caption').textContent = finalSpeech || interim || 'Listening...';
+        };
+
+        rec.onend = () => {
+          state.liveRec = null;
+          if (!state.isLiveActive) return;
+          const spoken = finalSpeech.trim();
+          if (spoken) {
+            processLiveTurn(spoken);
+          } else if (!state.liveMuted && !state.isStreaming) {
+            setTimeout(() => startLiveRecognition(), 250);
+          }
+        };
+
+        rec.onerror = () => {
+          state.liveRec = null;
+        };
+
+        state.liveRec = rec;
+        try {
+          rec.start();
+        } catch (e) {}
+      }
+
+      function processLiveTurn(text) {
+        if (!text.trim()) return;
+        appendLiveTranscript('user', text);
+        sendMessage(text, {
+          style: 'voice_live',
+          onLivePhase: (phase, cap) => setLiveVisualState(phase, cap),
+          onLiveCaption: (cap) => {
+            $('live-caption').textContent = cap;
+          },
+          onLiveComplete: (reply) => {
+            appendLiveTranscript('assistant', reply);
+            if (!state.isLiveActive) return;
+            setLiveVisualState('Speaking', reply.slice(0, 140));
+            speakText(reply, () => {
+              if (state.isLiveActive && !state.liveMuted) {
+                startLiveRecognition();
+              }
+            });
+          },
+        });
+      }
+
+      // =====================================================================
+      // 13. Full-Screen Settings & Sub-Sheets
+      // =====================================================================
+      function openSettings() {
+        syncSettingsUI();
+        const screen = $('settings-screen');
+        screen.classList.remove('hidden');
+        screen.classList.add('flex');
+      }
+
+      function closeSettings() {
+        const screen = $('settings-screen');
+        screen.classList.add('hidden');
+        screen.classList.remove('flex');
+      }
+
+      function syncSettingsUI() {
+        const lens = LENS_CONFIG[state.settings.lens] || LENS_CONFIG.fusion;
+        $('settings-workspace-label').textContent = state.settings.workspace || 'Personal';
+        $('settings-customize-sub').textContent =
+          lens.label + ' · Leo Star Thinking ' + (state.settings.leoThinking ? 'ON' : 'OFF');
+        $('popover-leo-state').textContent = state.settings.leoThinking ? 'ON' : 'OFF';
+        $('popover-lens-name').textContent = lens.label.split(' ')[0];
+      }
+
+      function openSubSheet(title, htmlContent, onMount) {
+        $('sub-sheet-title').textContent = title;
+        $('sub-sheet-body').innerHTML = htmlContent;
+        const modal = $('sub-sheet-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        if (typeof onMount === 'function') onMount($('sub-sheet-body'));
+      }
+
+      function closeSubSheet() {
+        const modal = $('sub-sheet-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+
+      function openCustomizeSheet() {
+        const optionsHtml = Object.keys(LENS_CONFIG)
+          .map((key) => {
+            const item = LENS_CONFIG[key];
+            const active = state.settings.lens === key;
+            return (
+              '<button type="button" data-select-lens="' +
+              key +
+              '" class="w-full p-3 rounded-2xl border text-left transition cursor-pointer ' +
+              (active ? 'border-cosmo-blue bg-blue-50/70' : 'border-gray-200 hover:bg-gray-50') +
+              '">' +
+              '<div class="flex items-center justify-between">' +
+              '<span class="font-semibold text-gray-900">' +
+              item.label +
+              '</span>' +
+              (active ? '<span class="text-xs font-semibold text-cosmo-blue">Active</span>' : '') +
+              '</div>' +
+              '<p class="text-xs text-gray-500 mt-1">' +
+              item.directive +
+              '</p>' +
+              '</button>'
+            );
+          })
+          .join('');
+
+        openSubSheet(
+          'Customize Cosmo AI',
+          '<div class="space-y-2">' +
+            '<div class="text-xs font-semibold uppercase tracking-wider text-gray-400">Intelligence Mode</div>' +
+            optionsHtml +
+            '</div>' +
+            '<div class="pt-2 border-t border-gray-100 flex items-center justify-between">' +
+            '<div><div class="font-semibold text-gray-900">Leo Star Thinking</div><div class="text-xs text-gray-500">Show structured reasoning drawer</div></div>' +
+            '<button id="sheet-toggle-leo" type="button" class="px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer ' +
+            (state.settings.leoThinking ? 'bg-cosmo-blue text-white' : 'bg-gray-200 text-gray-800') +
+            '">' +
+            (state.settings.leoThinking ? 'ON' : 'OFF') +
+            '</button>' +
+            '</div>',
+          (container) => {
+            container.querySelectorAll('[data-select-lens]').forEach((btn) => {
+              btn.addEventListener('click', () => {
+                state.settings.lens = btn.getAttribute('data-select-lens');
+                saveSettings();
+                syncSettingsUI();
+                closeSubSheet();
+                showToast('Switched to ' + LENS_CONFIG[state.settings.lens].label);
+              });
+            });
+            const leoBtn = container.querySelector('#sheet-toggle-leo');
+            if (leoBtn) {
+              leoBtn.addEventListener('click', () => {
+                state.settings.leoThinking = !state.settings.leoThinking;
+                saveSettings();
+                syncSettingsUI();
+                openCustomizeSheet();
+              });
+            }
+          }
+        );
+      }
+
+      // =====================================================================
+      // 14. Bind All Event Listeners Safely After DOM Ready
+      // =====================================================================
+      function initApp() {
+        loadState();
+        syncFirstTimeApiCard();
+        syncAuthUI();
+        syncSettingsUI();
+        renderSidebarHistory();
+        renderChatView();
+        updateStyleIndicator();
+        syncBlueButtonState();
+
+        const firstTimeSaveBtn = $('first-time-api-save-btn');
+        if (firstTimeSaveBtn) {
+          firstTimeSaveBtn.addEventListener('click', handleFirstTimeApiSave);
+        }
+        const firstTimeApiInput = $('first-time-api-input');
+        if (firstTimeApiInput) {
+          firstTimeApiInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleFirstTimeApiSave();
+            }
+          });
+        }
+
+        // Sidebar open/close
+        $('menu-toggle-btn').addEventListener('click', openSidebar);
+        $('sidebar-backdrop').addEventListener('click', closeSidebar);
+
+        // Sidebar search
+        $('sidebar-search-toggle').addEventListener('click', () => {
+          const bar = $('sidebar-search-bar');
+          bar.classList.toggle('hidden');
+          if (!bar.classList.contains('hidden')) {
+            $('sidebar-search-input').focus();
+          }
+        });
+        $('sidebar-search-input').addEventListener('input', (e) => {
+          state.searchQuery = e.target.value;
+          renderSidebarHistory();
+        });
+        $('sidebar-search-clear').addEventListener('click', () => {
+          state.searchQuery = '';
+          $('sidebar-search-input').value = '';
+          $('sidebar-search-bar').classList.add('hidden');
+          renderSidebarHistory();
+        });
+
+        // See all chats toggle
+        $('see-all-chats-btn').addEventListener('click', () => {
+          state.showAllChats = !state.showAllChats;
+          renderSidebarHistory();
+        });
+
+        // New chat buttons
+        $('header-new-chat-btn').addEventListener('click', () => {
+          startFreshChat();
+          showToast('Started a fresh chat');
+        });
+        $('sidebar-new-chat-btn').addEventListener('click', () => {
+          startFreshChat();
+          closeSidebar();
+        });
+
+        // Sidebar workspace tools
+        document.querySelectorAll('.sidebar-nav-item').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const action = btn.getAttribute('data-nav-action');
+            closeSidebar();
+            if (action === 'customize') {
+              openCustomizeSheet();
+            } else if (action === 'images') {
+              startFreshChat();
+              state.pendingAndaz = 'image';
+              updateStyleIndicator();
+              $('prompt-input').value = 'Create a detailed, photorealistic image concept of ';
+              $('prompt-input').focus();
+              syncBlueButtonState();
+            } else if (action === 'projects' || action === 'coding') {
+              startFreshChat();
+              state.pendingAndaz = 'coding';
+              updateStyleIndicator();
+              $('prompt-input').focus();
+            } else if (action === 'library') {
+              openSidebar();
+              state.showAllChats = true;
+              renderSidebarHistory();
+              showToast('Showing full conversation library');
+            } else if (action === 'remote') {
+              openGoLive();
+            } else if (action === 'explore') {
+              openCustomizeSheet();
+            }
+          });
+        });
+
+        // Starter prompt buttons
+        document.querySelectorAll('.starter-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const promptText = btn.getAttribute('data-starter') || '';
+            const style = btn.getAttribute('data-starter-style') || 'auto';
+            state.pendingAndaz = style;
+            updateStyleIndicator();
+            sendMessage(promptText, { style: style });
+          });
+        });
+
+        // Auth buttons (Header + Sidebar)
+        $('header-signin-btn').addEventListener('click', () => openAuthModal('login'));
+        $('header-signup-btn').addEventListener('click', () => openAuthModal('signup'));
+        $('sidebar-signin-btn').addEventListener('click', () => {
+          closeSidebar();
+          openAuthModal('login');
+        });
+        $('sidebar-signup-btn').addEventListener('click', () => {
+          closeSidebar();
+          openAuthModal('signup');
+        });
+        $('cosmo-plus-pill').addEventListener('click', openCustomizeSheet);
+
+        // Auth modal tabs & form
+        $('auth-tab-login').addEventListener('click', () => openAuthModal('login'));
+        $('auth-tab-signup').addEventListener('click', () => openAuthModal('signup'));
+        $('close-signin-btn').addEventListener('click', closeAuthModal);
+        $('continue-guest-btn').addEventListener('click', closeAuthModal);
+
+        $('signin-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const email = $('signin-email-input').value.trim();
+          const rawName = $('signin-name-input').value.trim();
+          if (!email) return;
+          const name = rawName || email.split('@')[0];
+          saveUser({ name: name, email: email, provider: 'Email' });
+          syncAuthUI();
+          closeAuthModal();
+          showToast('Signed in as ' + name);
+        });
+
+        document.querySelectorAll('.oauth-provider-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const provider = btn.getAttribute('data-oauth-provider') || 'Google';
+            const userObj = {
+              name: CREATOR_NAME,
+              email: 'sadeed.hashmi@' + provider.toLowerCase() + '.com',
+              provider: provider,
+            };
+            saveUser(userObj);
+            syncAuthUI();
+            closeAuthModal();
+            showToast('Signed in with ' + provider);
+          });
+        });
+
+        // "+" Popover & Word-to-Text Extractor
+        $('plus-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          $('plus-popover').classList.toggle('hidden');
+        });
+        document.addEventListener('click', (e) => {
+          const pop = $('plus-popover');
+          if (!pop.classList.contains('hidden') && !pop.contains(e.target) && e.target !== $('plus-btn')) {
+            pop.classList.add('hidden');
+          }
+        });
+
+        $('popover-word-to-text').addEventListener('click', () => {
+          $('plus-popover').classList.add('hidden');
+          $('hidden-word-input').click();
+        });
+        $('popover-attach-file').addEventListener('click', () => {
+          $('plus-popover').classList.add('hidden');
+          $('hidden-file-input').click();
+        });
+        $('popover-toggle-leo').addEventListener('click', () => {
+          state.settings.leoThinking = !state.settings.leoThinking;
+          saveSettings();
+          syncSettingsUI();
+          showToast('Leo Star Thinking ' + (state.settings.leoThinking ? 'Enabled' : 'Disabled'));
+        });
+        $('popover-open-customize').addEventListener('click', () => {
+          $('plus-popover').classList.add('hidden');
+          openCustomizeSheet();
+        });
+
+        $('hidden-word-input').addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleDocumentFile(e.target.files[0]);
+            e.target.value = '';
+          }
+        });
+        $('hidden-file-input').addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleDocumentFile(e.target.files[0]);
+            e.target.value = '';
+          }
+        });
+
+        // Attached Word Doc Controls
+        $('word-doc-preview-toggle').addEventListener('click', () => {
+          $('word-doc-editor-wrap').classList.toggle('hidden');
+        });
+        $('word-doc-textarea').addEventListener('input', (e) => {
+          if (state.attachedDoc) {
+            state.attachedDoc.text = e.target.value;
+            renderAttachedDocUI();
+          }
+        });
+        $('word-doc-copy-btn').addEventListener('click', () => {
+          if (state.attachedDoc) {
+            copyTextToClipboard(state.attachedDoc.text);
+            showToast('Extracted document text copied');
+          }
+        });
+        $('word-doc-insert-btn').addEventListener('click', () => {
+          if (state.attachedDoc) {
+            const current = $('prompt-input').value;
+            $('prompt-input').value = (current ? current + '\n\n' : '') + state.attachedDoc.text;
+            state.attachedDoc = null;
+            renderAttachedDocUI();
+            syncBlueButtonState();
+            $('prompt-input').focus();
+            showToast('Inserted extracted text into input');
+          }
+        });
+        $('word-doc-remove-btn').addEventListener('click', () => {
+          state.attachedDoc = null;
+          renderAttachedDocUI();
+          syncBlueButtonState();
+        });
+
+        // Prompt Input & Dynamic Royal Blue Button
+        $('prompt-input').addEventListener('input', syncBlueButtonState);
+        $('prompt-input').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (!state.isStreaming) sendMessage();
+          }
+        });
+
+        $('chat-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          if (!state.isStreaming) sendMessage();
+        });
+
+        $('blue-action-btn').addEventListener('click', () => {
+          const mode = $('blue-action-btn').dataset.mode;
+          if (mode === 'stop' && state.abortController) {
+            state.abortController.abort();
+          } else if (mode === 'send') {
+            sendMessage();
+          } else {
+            openGoLive();
+          }
+        });
+
+        // Mic Dictation
+        $('dictate-btn').addEventListener('click', toggleDictation);
+
+        // Go Live Overlay Controls
+        $('close-live-btn').addEventListener('click', closeGoLive);
+        $('live-lens-select').addEventListener('change', (e) => {
+          state.settings.lens = e.target.value;
+          saveSettings();
+          syncSettingsUI();
+        });
+        $('live-mic-toggle').addEventListener('click', () => {
+          state.liveMuted = !state.liveMuted;
+          if (state.liveMuted) {
+            if (state.liveRec) { try { state.liveRec.stop(); } catch (e) {} }
+            $('live-mic-toggle').classList.add('bg-rose-100', 'text-rose-600');
+            setLiveVisualState('Muted', 'Microphone muted');
+          } else {
+            $('live-mic-toggle').classList.remove('bg-rose-100', 'text-rose-600');
+            startLiveRecognition();
+          }
+        });
+        $('live-barge-in-btn').addEventListener('click', () => {
+          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+          if (state.abortController) state.abortController.abort();
+          startLiveRecognition();
+        });
+        $('live-text-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const val = $('live-text-input').value.trim();
+          if (!val) return;
+          $('live-text-input').value = '';
+          processLiveTurn(val);
+        });
+
+        // Settings Screen & Rows
+        $('sidebar-profile-settings-btn').addEventListener('click', () => {
+          closeSidebar();
+          openSettings();
+        });
+        $('settings-back-btn').addEventListener('click', closeSettings);
+        $('close-sub-sheet-btn').addEventListener('click', closeSubSheet);
+
+        $('settings-search-input').addEventListener('input', (e) => {
+          const q = e.target.value.trim().toLowerCase();
+          document.querySelectorAll('[data-setting-item]').forEach((row) => {
+            const hay = (row.getAttribute('data-setting-item') || '').toLowerCase();
+            row.classList.toggle('hidden', Boolean(q) && !hay.includes(q));
+          });
+        });
+
+        $('setting-row-account').addEventListener('click', () => {
+          if (state.user) {
+            openSubSheet(
+              'Account',
+              '<div class="p-3.5 rounded-2xl bg-gray-50 space-y-1">' +
+                '<div class="font-semibold text-gray-900">' +
+                escapeHtml(state.user.name) +
+                '</div>' +
+                '<div class="text-xs text-gray-500">' +
+                escapeHtml(state.user.email) +
+                '</div>' +
+                '</div>' +
+                '<button id="sheet-logout-btn" type="button" class="w-full py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold cursor-pointer">Log out</button>',
+              (c) => {
+                c.querySelector('#sheet-logout-btn').addEventListener('click', () => {
+                  saveUser(null);
+                  syncAuthUI();
+                  closeSubSheet();
+                  showToast('Logged out');
+                });
+              }
+            );
+          } else {
+            closeSettings();
+            openAuthModal('login');
+          }
+        });
+
+        $('setting-row-workspace').addEventListener('click', () => {
+          const next = state.settings.workspace === 'Personal' ? 'Hash Group of Intelligence' : 'Personal';
+          state.settings.workspace = next;
+          saveSettings();
+          syncSettingsUI();
+          showToast('Workspace switched to ' + next);
+        });
+
+        $('setting-row-upgrade').addEventListener('click', () => {
+          openSubSheet(
+            'Cosmo Plus Active',
+            '<div class="p-4 rounded-2xl bg-blue-50 border border-blue-100 space-y-2">' +
+              '<div class="font-semibold text-cosmo-blue">✦ Cosmo Plus + Leo Star Unlocked</div>' +
+              '<p class="text-xs text-gray-600 leading-relaxed">Full multi-engine intelligence (Claude Editorial × Gemini Multimodal × GPT Precision + Leo Star Deep Thinking), Word-to-Text extraction, and Cosmo Go Live voice chat are enabled.</p>' +
+              '</div>'
+          );
+        });
+
+        $('setting-row-customize').addEventListener('click', openCustomizeSheet);
+
+        const showCreatorInfo = () => {
+          openSubSheet(
+            'Creator & Organization',
+            '<div class="space-y-3">' +
+              '<div class="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-1">' +
+              '<div class="text-xs font-semibold uppercase tracking-wider text-cosmo-blue">Full AI Created By</div>' +
+              '<div class="text-lg font-bold text-gray-900">' +
+              CREATOR_NAME +
+              '</div>' +
+              '<div class="text-xs font-medium text-gray-700">' +
+              CREATOR_TITLE +
+              '</div>' +
+              '</div>' +
+              '<p class="text-xs text-gray-600 leading-relaxed"><strong>Cosmo AI</strong> is developed under <strong>' +
+              ORGANIZATION_NAME +
+              '</strong> to unify editorial reasoning, structured synthesis, precision coding, Word document intelligence, and natural live voice conversation in one seamless platform.</p>' +
+              '</div>'
+          );
+        };
+
+        $('setting-row-creator').addEventListener('click', showCreatorInfo);
+        $('settings-info-btn').addEventListener('click', showCreatorInfo);
+
+        $('setting-row-general').addEventListener('click', () => {
+          openSubSheet(
+            'General',
+            '<div class="space-y-3">' +
+              '<p class="text-xs text-gray-500">Manage local browser storage and conversation history.</p>' +
+              '<button id="sheet-clear-chats-btn" type="button" class="w-full py-2.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold cursor-pointer">Clear All Saved Chat History</button>' +
+              '</div>',
+            (c) => {
+              c.querySelector('#sheet-clear-chats-btn').addEventListener('click', () => {
+                state.chats = [];
+                state.activeChatId = null;
+                saveChats();
+                renderSidebarHistory();
+                renderChatView();
+                closeSubSheet();
+                showToast('All chat history cleared');
+              });
+            }
+          );
+        });
+
+        $('setting-row-usage').addEventListener('click', () => {
+          const totalMsgs = state.chats.reduce((acc, c) => acc + (c.messages ? c.messages.length : 0), 0);
+          openSubSheet(
+            'Usage and limits',
+            '<div class="grid grid-cols-2 gap-3">' +
+              '<div class="p-3.5 rounded-2xl bg-gray-50"><div class="text-xs text-gray-500">Saved Chats</div><div class="text-xl font-bold text-gray-900 mt-1">' +
+              state.chats.length +
+              '</div></div>' +
+              '<div class="p-3.5 rounded-2xl bg-gray-50"><div class="text-xs text-gray-500">Total Messages</div><div class="text-xl font-bold text-gray-900 mt-1">' +
+              totalMsgs +
+              '</div></div>' +
+              '</div>'
+          );
+        });
+
+        $('setting-row-notifications').addEventListener('click', () => {
+          state.settings.notifications = !state.settings.notifications;
+          saveSettings();
+          showToast('Notifications ' + (state.settings.notifications ? 'enabled' : 'muted'));
+        });
+
+        $('setting-row-voice').addEventListener('click', () => {
+          openSubSheet(
+            'Voice Settings',
+            '<div class="flex items-center justify-between p-3.5 rounded-2xl bg-gray-50">' +
+              '<div><div class="font-semibold text-gray-900">Auto-Speak Replies</div><div class="text-xs text-gray-500">Read AI answers aloud automatically</div></div>' +
+              '<button id="sheet-autospeak-btn" type="button" class="px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer ' +
+              (state.settings.autoSpeak ? 'bg-cosmo-blue text-white' : 'bg-gray-200 text-gray-800') +
+              '">' +
+              (state.settings.autoSpeak ? 'ON' : 'OFF') +
+              '</button>' +
+              '</div>' +
+              '<button id="sheet-launch-live-btn" type="button" class="w-full py-2.5 rounded-full bg-cosmo-blue hover:bg-cosmo-blueHover text-white text-xs font-semibold cursor-pointer">Launch Cosmo Go Live</button>',
+            (c) => {
+              c.querySelector('#sheet-autospeak-btn').addEventListener('click', (e) => {
+                state.settings.autoSpeak = !state.settings.autoSpeak;
+                saveSettings();
+                e.target.textContent = state.settings.autoSpeak ? 'ON' : 'OFF';
+                e.target.className =
+                  'px-4 py-1.5 rounded-full text-xs font-semibold cursor-pointer ' +
+                  (state.settings.autoSpeak ? 'bg-cosmo-blue text-white' : 'bg-gray-200 text-gray-800');
+              });
+              c.querySelector('#sheet-launch-live-btn').addEventListener('click', () => {
+                closeSubSheet();
+                closeSettings();
+                openGoLive();
+              });
+            }
+          );
+        });
+
+        $('setting-row-safety').addEventListener('click', () => {
+          openSubSheet(
+            'Safety & wellbeing',
+            '<p class="text-xs text-gray-600 leading-relaxed">All conversations, Andaz preferences, and Word-to-Text extractions are stored privately on your own device in browser LocalStorage.</p>'
+          );
+        });
+
+        $('setting-row-security').addEventListener('click', () => {
+          openSubSheet(
+            'Security and login',
+            '<div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-1">' +
+              '<div class="font-semibold">✓ OpenRouter Gateway Active &amp; Locked</div>' +
+              '<div>Your session is authenticated and locked in LocalStorage for uninterrupted access.</div>' +
+              '</div>'
+          );
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
+      } else {
+        initApp();
+      }
+    })();
+  </script>
+</body>
+</html>
+```
